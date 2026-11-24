@@ -53,7 +53,7 @@ export default function ImportReceiptsModal({ isOpen, onClose, onImportSuccess }
     setSelectedFiles(files);
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (force = false) => {
     if (selectedFiles.length === 0) return;
     setIsUploading(true);
     setMessage(null);
@@ -64,20 +64,64 @@ export default function ImportReceiptsModal({ isOpen, onClose, onImportSuccess }
     });
 
     try {
-      const res = await api.uploadReceipts(formData);
+      const res = await api.uploadReceipts(formData, force);
       if (res.success) {
-        setMessage({
-          type: 'success',
-          text: `Processed ${res.count} file(s). Review and verify extracted invoice details below.`
-        });
-        setSelectedFiles([]);
-        if (fileInputRef.current) fileInputRef.current.value = null;
+        const newItems = res.newImports || [];
+        const duplicates = res.duplicates || [];
+
         await loadImports();
+
+        if (newItems.length > 0 && duplicates.length === 0) {
+          setMessage({
+            type: 'success',
+            text: `Successfully uploaded and extracted ${newItems.length} receipt(s)! Review details below.`
+          });
+          // Automatically open first new item for review
+          handleStartReview(newItems[0]);
+        } else if (newItems.length > 0 && duplicates.length > 0) {
+          setMessage({
+            type: 'warning',
+            text: `Uploaded ${newItems.length} receipt(s). ${duplicates.length} duplicate file(s) skipped.`
+          });
+          handleStartReview(newItems[0]);
+        } else if (duplicates.length > 0) {
+          const dup = duplicates[0];
+          const invInfo = dup.existingInvoiceNumber ? ` as Invoice "${dup.existingInvoiceNumber}"` : '';
+          setMessage({
+            type: 'warning',
+            text: `Duplicate file detected: "${dup.filename}" was already uploaded previously${invInfo}.`,
+            isDuplicate: true,
+            duplicateItem: dup
+          });
+
+          // If the duplicate item exists in imports list, open review or preview
+          const existingInList = importsList.find(i => String(i._id) === String(dup.existingImportId));
+          if (existingInList) {
+            handleStartReview(existingInList);
+          }
+        } else {
+          setMessage({
+            type: 'success',
+            text: `Processed ${res.count} file(s).`
+          });
+        }
+
+        if (newItems.length > 0 || duplicates.length === 0) {
+          setSelectedFiles([]);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
       }
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleRemoveSelectedFile = (indexToRemove) => {
+    setSelectedFiles(selectedFiles.filter((_, idx) => idx !== indexToRemove));
+    if (selectedFiles.length <= 1 && fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -203,20 +247,49 @@ export default function ImportReceiptsModal({ isOpen, onClose, onImportSuccess }
           {/* Notification Banner */}
           {message && (
             <div style={{
-              padding: '0.75rem 1rem',
+              padding: '0.85rem 1.1rem',
               borderRadius: '8px',
               marginBottom: '1.25rem',
               fontSize: '0.82rem',
               fontWeight: 600,
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
               gap: '0.5rem',
-              background: message.type === 'error' ? 'var(--danger-bg)' : 'var(--success-bg)',
-              color: message.type === 'error' ? 'var(--danger)' : '#065f46',
-              border: `1px solid ${message.type === 'error' ? '#fca5a5' : '#a7f3d0'}`
+              background: message.type === 'error' 
+                ? 'var(--danger-bg)' 
+                : message.type === 'warning' 
+                  ? '#fffbeb' 
+                  : 'var(--success-bg)',
+              color: message.type === 'error' 
+                ? 'var(--danger)' 
+                : message.type === 'warning' 
+                  ? '#92400e' 
+                  : '#065f46',
+              border: `1px solid ${
+                message.type === 'error' 
+                  ? '#fca5a5' 
+                  : message.type === 'warning' 
+                    ? '#fcd34d' 
+                    : '#a7f3d0'
+              }`
             }}>
-              {message.type === 'error' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
-              <span>{message.text}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {message.type === 'error' ? <AlertTriangle size={17} /> : message.type === 'warning' ? <AlertTriangle size={17} color="#d97706" /> : <CheckCircle2 size={17} />}
+                  <span>{message.text}</span>
+                </div>
+                {message.isDuplicate && (
+                  <button
+                    type="button"
+                    onClick={() => handleUpload(true)}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', color: '#92400e', borderColor: '#fcd34d' }}
+                    title="Force re-upload and re-extract this receipt"
+                  >
+                    <span>Force Re-extract</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -224,7 +297,7 @@ export default function ImportReceiptsModal({ isOpen, onClose, onImportSuccess }
           <div style={{
             border: '2px dashed var(--slate-300)',
             borderRadius: '12px',
-            padding: '2rem 1.5rem',
+            padding: '1.75rem 1.5rem',
             textAlign: 'center',
             backgroundColor: 'var(--slate-50)',
             marginBottom: '1.5rem',
@@ -239,29 +312,71 @@ export default function ImportReceiptsModal({ isOpen, onClose, onImportSuccess }
               accept=".pdf,.jpg,.jpeg,.png"
               style={{ display: 'none' }}
             />
-            <UploadCloud size={40} color="var(--gold-500)" style={{ margin: '0 auto 0.75rem' }} />
-            <h4 style={{ fontWeight: 700, color: 'var(--slate-800)', fontSize: '0.95rem' }}>
+            <UploadCloud size={38} color="var(--gold-500)" style={{ margin: '0 auto 0.5rem' }} />
+            <h4 style={{ fontWeight: 700, color: 'var(--slate-800)', fontSize: '0.92rem' }}>
               Click to browse or drop historical receipts here
             </h4>
-            <p style={{ fontSize: '0.78rem', color: 'var(--slate-500)', marginTop: '0.25rem' }}>
+            <p style={{ fontSize: '0.76rem', color: 'var(--slate-500)', marginTop: '0.2rem' }}>
               Supports multiple PDF, JPG, JPEG, and PNG files up to 25 MB each. Files are preserved in MongoDB GridFS.
             </p>
 
             {selectedFiles.length > 0 && (
-              <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <span className="badge badge-gold" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
-                  {selectedFiles.length} file(s) selected
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); handleUpload(); }}
-                  disabled={isUploading}
-                  className="btn btn-primary"
-                  style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
-                >
-                  <RefreshCw size={14} className={isUploading ? 'spin' : ''} />
-                  <span>{isUploading ? 'Extracting & Uploading...' : 'Upload & Extract Details'}</span>
-                </button>
+              <div style={{ marginTop: '1rem' }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', marginBottom: '0.85rem' }}>
+                  {selectedFiles.map((file, idx) => (
+                    <div 
+                      key={idx}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: '#ffffff',
+                        border: '1px solid var(--border-color)',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        color: 'var(--slate-800)'
+                      }}
+                    >
+                      <FileText size={13} color="var(--gold-600)" />
+                      <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                        {file.name}
+                      </span>
+                      <span style={{ color: 'var(--slate-500)', fontSize: '0.7rem' }}>
+                        ({(file.size / 1024).toFixed(0)} KB)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleRemoveSelectedFile(idx); }}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+                        title="Remove file"
+                      >
+                        <X size={12} color="var(--slate-400)" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleUpload(false); }}
+                    disabled={isUploading}
+                    className="btn btn-primary"
+                    style={{ padding: '0.45rem 1.15rem', fontSize: '0.82rem' }}
+                  >
+                    <RefreshCw size={14} className={isUploading ? 'spin' : ''} />
+                    <span>{isUploading ? 'Extracting & Uploading...' : `Upload & Extract (${selectedFiles.length})`}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setSelectedFiles([]); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem' }}
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -421,7 +536,10 @@ export default function ImportReceiptsModal({ isOpen, onClose, onImportSuccess }
                 </thead>
                 <tbody>
                   {importsList.map((item) => (
-                    <tr key={item._id}>
+                    <tr 
+                      key={item._id}
+                      style={activeReviewItem?._id === item._id ? { background: 'rgba(180, 133, 40, 0.08)', outline: '1.5px solid var(--gold-400)' } : undefined}
+                    >
                       <td>
                         <div style={{ fontWeight: 600, color: 'var(--slate-900)', fontSize: '0.8rem' }}>
                           {item.originalFilename}

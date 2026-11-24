@@ -3,11 +3,9 @@
  * Centralized HTTP client communicating with Express backend & MongoDB Atlas.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL 
-  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api`
-  : '/api';
-
-const BASE_URL = API_BASE;
+// Use local proxy /api in development, or VITE_API_URL when explicitly deployed / production
+const REMOTE_API = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api` : null;
+let activeBaseUrl = import.meta.env.DEV ? '/api' : (REMOTE_API || '/api');
 
 async function fetchWithTimeout(resource, options = {}) {
   const { timeout = 12000, ...fetchOptions } = options;
@@ -22,11 +20,22 @@ async function fetchWithTimeout(resource, options = {}) {
     return response;
   } catch (error) {
     clearTimeout(id);
+    // If remote connection failed, auto-fallback to local /api proxy if available
+    if (REMOTE_API && resource.startsWith(REMOTE_API)) {
+      console.warn(`[API] Remote endpoint ${resource} unreachable (${error.message}). Failing over to /api...`);
+      activeBaseUrl = '/api';
+      const fallbackResource = resource.replace(REMOTE_API, '/api');
+      return fetch(fallbackResource, fetchOptions);
+    }
     if (error.name === 'AbortError') {
-      throw new Error('Connection timed out. Render backend may be waking up.');
+      throw new Error('Connection timed out. Server took too long to respond.');
     }
     throw error;
   }
+}
+
+function getBaseUrl() {
+  return activeBaseUrl;
 }
 
 function getAuthHeaders() {
@@ -44,7 +53,7 @@ export const api = {
   // Invoices API
   async getInvoices(params = {}) {
     const query = new URLSearchParams(params).toString();
-    const res = await fetchWithTimeout(`${BASE_URL}/invoices?${query}`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/invoices?${query}`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch invoices');
@@ -52,7 +61,7 @@ export const api = {
   },
 
   async getInvoiceById(id) {
-    const res = await fetchWithTimeout(`${BASE_URL}/invoices/${id}`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/invoices/${id}`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch invoice');
@@ -61,7 +70,7 @@ export const api = {
 
   async peekNextNumber(clientName = '', date = '') {
     const query = new URLSearchParams({ clientName, date }).toString();
-    const res = await fetchWithTimeout(`${BASE_URL}/invoices/next-number?${query}`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/invoices/next-number?${query}`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error((await res.json()).error || 'Failed to peek next invoice number');
@@ -69,7 +78,7 @@ export const api = {
   },
 
   async createInvoice(invoiceData) {
-    const res = await fetchWithTimeout(`${BASE_URL}/invoices`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/invoices`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(invoiceData)
@@ -80,7 +89,7 @@ export const api = {
   },
 
   async updateInvoice(id, invoiceData) {
-    const res = await fetchWithTimeout(`${BASE_URL}/invoices/${id}`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/invoices/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(invoiceData)
@@ -91,7 +100,7 @@ export const api = {
   },
 
   async trashInvoice(id) {
-    const res = await fetchWithTimeout(`${BASE_URL}/invoices/${id}/trash`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/invoices/${id}/trash`, {
       method: 'POST',
       headers: getAuthHeaders()
     });
@@ -101,7 +110,7 @@ export const api = {
   },
 
   async restoreInvoice(id) {
-    const res = await fetchWithTimeout(`${BASE_URL}/invoices/${id}/restore`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/invoices/${id}/restore`, {
       method: 'POST',
       headers: getAuthHeaders()
     });
@@ -111,7 +120,7 @@ export const api = {
   },
 
   async permanentDeleteInvoice(id) {
-    const res = await fetchWithTimeout(`${BASE_URL}/invoices/${id}`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/invoices/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
@@ -121,13 +130,14 @@ export const api = {
   },
 
   // Historical Receipts & Imports API
-  async uploadReceipts(formData) {
+  async uploadReceipts(formData, force = false) {
     const token = localStorage.getItem('astittva_token');
     const headers = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    const res = await fetchWithTimeout(`${BASE_URL}/imports/upload`, {
+    const url = force ? `${getBaseUrl()}/imports/upload?force=true` : `${getBaseUrl()}/imports/upload`;
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers,
       body: formData,
@@ -139,7 +149,7 @@ export const api = {
   },
 
   async getImports() {
-    const res = await fetchWithTimeout(`${BASE_URL}/imports`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/imports`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch imports');
@@ -147,7 +157,7 @@ export const api = {
   },
 
   async verifyImport(importId, verifiedData) {
-    const res = await fetchWithTimeout(`${BASE_URL}/imports/${importId}/verify`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/imports/${importId}/verify`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(verifiedData)
@@ -158,7 +168,7 @@ export const api = {
   },
 
   async deleteImport(id) {
-    const res = await fetchWithTimeout(`${BASE_URL}/imports/${id}`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/imports/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
@@ -168,12 +178,12 @@ export const api = {
   },
 
   getGridFSFileUrl(fileId) {
-    return `${BASE_URL}/imports/file/${fileId}`;
+    return `${getBaseUrl()}/imports/file/${fileId}`;
   },
 
   // Settings API
   async getSettings() {
-    const res = await fetchWithTimeout(`${BASE_URL}/settings`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/settings`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch settings');
@@ -181,7 +191,7 @@ export const api = {
   },
 
   async updateSettings(settingsData) {
-    const res = await fetchWithTimeout(`${BASE_URL}/settings`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/settings`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(settingsData)
@@ -193,7 +203,7 @@ export const api = {
 
   // Auth API
   async login(email, password) {
-    const res = await fetchWithTimeout(`${BASE_URL}/auth/login`, {
+    const res = await fetchWithTimeout(`${getBaseUrl()}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })

@@ -33,6 +33,7 @@ async function uploadReceipts(req, res) {
     const imports = getImportsCollection();
     const bucket = getGridFSBucket();
     const results = [];
+    const isForce = req.query.force === 'true' || req.query.overwrite === 'true';
 
     for (const file of files) {
       const fileHash = calculateFileHash(file.buffer);
@@ -40,14 +41,24 @@ async function uploadReceipts(req, res) {
       // Check for duplicate file hash
       const existingImport = await imports.findOne({ fileHash });
       if (existingImport) {
-        results.push({
-          filename: file.originalname,
-          status: 'duplicate',
-          error: 'Duplicate file detected: This file has already been uploaded previously.',
-          existingImportId: existingImport._id,
-          fileHash
-        });
-        continue;
+        if (!isForce) {
+          results.push({
+            filename: file.originalname,
+            status: 'duplicate',
+            error: `Receipt "${file.originalname}" was already uploaded previously.`,
+            existingImportId: existingImport._id,
+            existingInvoiceNumber: existingImport.extractedData?.invoiceNumber || existingImport.verifiedInvoiceNumber || '',
+            existingClientName: existingImport.extractedData?.clientName || '',
+            existingStatus: existingImport.status,
+            fileHash
+          });
+          continue;
+        } else {
+          // If force re-upload is requested and older import is not verified, replace it
+          if (existingImport.status !== 'verified') {
+            await imports.deleteOne({ _id: existingImport._id });
+          }
+        }
       }
 
       // Stream file buffer to MongoDB GridFS
@@ -118,10 +129,17 @@ async function uploadReceipts(req, res) {
       });
     }
 
+    const newImports = results.filter(r => r.status !== 'duplicate');
+    const duplicates = results.filter(r => r.status === 'duplicate');
+
     res.json({
       success: true,
       count: results.length,
-      imports: results
+      newCount: newImports.length,
+      duplicateCount: duplicates.length,
+      imports: results,
+      newImports,
+      duplicates
     });
   } catch (err) {
     console.error('[ImportController] uploadReceipts error:', err);

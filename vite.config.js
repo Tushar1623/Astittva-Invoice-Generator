@@ -8,7 +8,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'https://astittva-invoice-generator-api.onrender.com',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false
       }
