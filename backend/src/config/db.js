@@ -1,24 +1,35 @@
-const { MongoClient, GridFSBucket } = require('mongodb');
+const mongoose = require('mongoose');
+const GridFSBucket = mongoose.mongo.GridFSBucket;
+const ObjectId = mongoose.Types.ObjectId;
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 const uri = process.env.MONGO_URL;
-const dbName = process.env.DB_NAME || 'astitva_realestate';
+const dbName = process.env.DB_NAME || 'astittva_invoice_db';
 
-let client = null;
-let db = null;
 let bucket = null;
 
+// Import all Mongoose models
+const models = require('../models');
+
 async function connectToDatabase() {
-  if (db && client) {
-    return { client, db, bucket };
+  if (mongoose.connection.readyState === 1 && bucket) {
+    return {
+      client: mongoose.connection.getClient(),
+      db: mongoose.connection.db,
+      bucket,
+      mongoose,
+      ...models
+    };
   }
 
   if (!uri) {
     throw new Error('MONGO_URL must be set in the backend environment.');
   }
 
-  client = new MongoClient(uri, {
+  // Connect Mongoose to MongoDB Atlas
+  await mongoose.connect(uri, {
+    dbName,
     maxPoolSize: 20,
     minPoolSize: 2,
     serverSelectionTimeoutMS: 15000,
@@ -27,46 +38,53 @@ async function connectToDatabase() {
     writeConcern: { w: 'majority' }
   });
 
-  await client.connect();
-  db = client.db(dbName);
+  const db = mongoose.connection.db;
   bucket = new GridFSBucket(db, { bucketName: 'fs' });
 
-  console.log(`[MongoDB] Connected successfully to Atlas database: "${dbName}"`);
+  console.log(`[MongoDB/Mongoose] Connected successfully to Atlas database: "${dbName}"`);
 
-  // Ensure collections and indexes exist
-  await initializeIndexes();
+  // Initialize indexes via Mongoose schemas
+  await initializeIndexes(db);
 
-  return { client, db, bucket };
+  return {
+    client: mongoose.connection.getClient(),
+    db,
+    bucket,
+    mongoose,
+    ...models
+  };
 }
 
-async function initializeIndexes() {
+async function initializeIndexes(db) {
   try {
-    const invoices = db.collection('invoices');
-    await invoices.createIndex({ invoiceNumber: 1 }, { unique: true, sparse: true });
-    await invoices.createIndex({ year: 1, month: 1, serialNumber: 1 });
-    await invoices.createIndex({ status: 1 });
-    await invoices.createIndex({ clientName: 1 });
+    // Ensure all Mongoose model indexes are registered
+    await Promise.all([
+      models.Invoice.init(),
+      models.Counter.init(),
+      models.InvoiceImport.init(),
+      models.CompanySettings.init(),
+      models.Client.init(),
+      models.AuditLog.init(),
+      models.User.init()
+    ]);
 
-    const imports = db.collection('invoiceImports');
-    await imports.createIndex({ fileHash: 1 });
-    await imports.createIndex({ status: 1 });
+    // GridFS indexes
+    await db.collection('fs.files').createIndex({ filename: 1, uploadDate: 1 });
+    await db.collection('fs.chunks').createIndex({ files_id: 1, n: 1 }, { unique: true });
 
-    const counters = db.collection('counters');
-    await counters.createIndex({ year: 1, month: 1 });
-
-    console.log('[MongoDB] Collections and indexes initialized successfully.');
+    console.log('[MongoDB/Mongoose] Models, collections and indexes initialized successfully.');
   } catch (err) {
-    console.warn('[MongoDB] Index creation notice:', err.message);
+    console.warn('[MongoDB/Mongoose] Index initialization notice:', err.message);
   }
 }
 
 function getDb() {
-  if (!db) throw new Error('Database not connected. Call connectToDatabase() first.');
-  return db;
+  if (!mongoose.connection.db) throw new Error('Database not connected. Call connectToDatabase() first.');
+  return mongoose.connection.db;
 }
 
 function getClient() {
-  return client;
+  return mongoose.connection.getClient();
 }
 
 function getGridFSBucket() {
@@ -113,5 +131,8 @@ module.exports = {
   getImportsCollection,
   getCompanySettingsCollection,
   getAuditLogsCollection,
-  getUsersCollection
+  getUsersCollection,
+  mongoose,
+  ObjectId,
+  ...models
 };

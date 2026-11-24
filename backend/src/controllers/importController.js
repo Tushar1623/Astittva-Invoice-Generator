@@ -1,9 +1,9 @@
-const { ObjectId } = require('mongodb');
 const { 
   getImportsCollection, 
   getInvoicesCollection, 
   getGridFSBucket, 
-  getClientsCollection 
+  getClientsCollection,
+  ObjectId
 } = require('../config/db');
 const { 
   calculateFileHash, 
@@ -61,24 +61,32 @@ async function uploadReceipts(req, res) {
         }
       }
 
-      // Stream file buffer to MongoDB GridFS
-      const uploadStream = bucket.openUploadStream(file.originalname, {
-        contentType: file.mimetype,
-        metadata: {
-          fileHash,
-          uploadedBy: req.user?.email || 'admin',
-          uploadedAt: new Date()
-        }
-      });
+      // Check if file binary already exists in GridFS
+      const existingFsFiles = await bucket.find({ 'metadata.fileHash': fileHash }).sort({ uploadDate: -1 }).limit(1).toArray();
+      let gridFsFileId;
 
-      await new Promise((resolve, reject) => {
-        uploadStream.end(file.buffer, (err) => {
-          if (err) reject(err);
-          else resolve();
+      if (existingFsFiles && existingFsFiles.length > 0 && !isForce) {
+        gridFsFileId = existingFsFiles[0]._id;
+      } else {
+        // Stream file buffer to MongoDB GridFS
+        const uploadStream = bucket.openUploadStream(file.originalname, {
+          contentType: file.mimetype,
+          metadata: {
+            fileHash,
+            uploadedBy: req.user?.email || 'admin',
+            uploadedAt: new Date()
+          }
         });
-      });
 
-      const gridFsFileId = uploadStream.id;
+        await new Promise((resolve, reject) => {
+          uploadStream.end(file.buffer, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+
+        gridFsFileId = uploadStream.id;
+      }
 
       // Extract text & parse fields
       const extractedText = await extractTextFromFile(file.buffer, file.mimetype);
@@ -180,13 +188,19 @@ async function verifyImport(req, res) {
       return res.status(400).json({ success: false, error: 'Invoice number is required to verify.' });
     }
 
-    // Check duplicate invoice number
-    const isUsed = await isInvoiceNumberUsed(invNumber);
-    if (isUsed && !verifiedData.overrideDuplicate) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Invoice number "${invNumber}" is already in use by another invoice.` 
-      });
+    const invoices = getInvoicesCollection();
+    const existingInv = await invoices.findOne({ invoiceNumber: invNumber });
+
+    // Check duplicate invoice number:
+    // If invoice exists with this number, allow updating/linking if it belongs to this import or was imported/migrated
+    if (existingInv && !verifiedData.overrideDuplicate && !verifiedData.linkExisting) {
+      if (existingInv.importRecordId && String(existingInv.importRecordId) !== String(importDoc._id)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invoice number "${invNumber}" is already in use by another invoice.`,
+          canLink: true
+        });
+      }
     }
 
     // Parse serial, month, year from invoice number
@@ -246,9 +260,27 @@ async function verifyImport(req, res) {
       updatedAt: new Date()
     };
 
-    const invoices = getInvoicesCollection();
-    const insertRes = await invoices.insertOne(newInvoice);
-    newInvoice._id = insertRes.insertedId;
+    let finalInvoiceId;
+    if (existingInv) {
+      await invoices.updateOne(
+        { _id: existingInv._id },
+        {
+          $set: {
+            ...newInvoice,
+            _id: existingInv._id,
+            status: 'active',
+            deletedAt: null,
+            updatedAt: new Date()
+          }
+        }
+      );
+      finalInvoiceId = existingInv._id;
+      newInvoice._id = existingInv._id;
+    } else {
+      const insertRes = await invoices.insertOne(newInvoice);
+      finalInvoiceId = insertRes.insertedId;
+      newInvoice._id = insertRes.insertedId;
+    }
 
     // Update import record status to 'verified'
     await imports.updateOne(
@@ -256,7 +288,7 @@ async function verifyImport(req, res) {
       {
         $set: {
           status: 'verified',
-          verifiedInvoiceId: insertRes.insertedId,
+          verifiedInvoiceId: finalInvoiceId,
           verifiedInvoiceNumber: invNumber,
           updatedAt: new Date()
         }
@@ -275,10 +307,10 @@ async function verifyImport(req, res) {
 
     await logAuditAction({
       action: 'IMPORT_VERIFY',
-      entityId: insertRes.insertedId,
+      entityId: finalInvoiceId,
       userId: req.user?.email || 'admin',
       userName: req.user?.name || 'Admin',
-      details: { importId: importDoc._id, invoiceNumber: invNumber }
+      details: { importId: importDoc._id, invoiceId: finalInvoiceId, invoiceNumber: invNumber }
     });
 
     res.json({
@@ -352,7 +384,7 @@ async function deleteImport(req, res) {
     let invoiceMovedToTrash = false;
     let invoiceNumber = null;
 
-    // If verified, find associated invoice and move it to Trash (soft deletion)
+    // If verified, find associated invoice created explicitly from this import and move it to Trash (soft deletion)
     if (importDoc.status === 'verified') {
       const invoices = getInvoicesCollection();
       let invQuery = null;
@@ -360,9 +392,7 @@ async function deleteImport(req, res) {
       if (importDoc.verifiedInvoiceId) {
         invQuery = { _id: importDoc.verifiedInvoiceId };
       } else if (importDoc.verifiedInvoiceNumber) {
-        invQuery = { invoiceNumber: importDoc.verifiedInvoiceNumber };
-      } else if (importDoc.extractedData?.invoiceNumber) {
-        invQuery = { invoiceNumber: importDoc.extractedData.invoiceNumber };
+        invQuery = { invoiceNumber: importDoc.verifiedInvoiceNumber, isImported: true };
       }
 
       if (invQuery) {

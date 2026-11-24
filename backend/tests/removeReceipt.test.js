@@ -7,9 +7,9 @@ const {
   getInvoicesCollection, 
   getGridFSBucket, 
   getAuditLogsCollection,
-  getCountersCollection 
+  getCountersCollection,
+  ObjectId
 } = require('../src/config/db');
-const { ObjectId } = require('mongodb');
 
 function request(options, data) {
   return new Promise((resolve, reject) => {
@@ -106,15 +106,17 @@ async function runRemoveReceiptTest() {
 
   // 4. Test Removal of Verified & Saved Record
   console.log('\n--- 2. Testing Removal of Verified & Saved Record ---');
-  // Create an invoice first
+  await invoicesCol.deleteMany({ invoiceNumber: { $regex: 'Test Verified' } });
+
   const testInvoice = {
-    invoiceNumber: 'Test Verified 099/11/2026',
+    invoiceNumber: `Test Verified ${Date.now()}`,
     serialNumber: 99,
     month: 11,
     year: 2026,
     clientName: 'Test Verified',
     customerName: 'NK Realtors',
     status: 'active',
+    isImported: true,
     financials: { taxableAmount: 50000, finalTotal: 59000 },
     createdAt: new Date()
   };

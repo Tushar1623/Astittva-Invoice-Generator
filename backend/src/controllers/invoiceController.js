@@ -1,5 +1,4 @@
-const { ObjectId } = require('mongodb');
-const { getInvoicesCollection, getClientsCollection, getClient } = require('../config/db');
+const { getInvoicesCollection, getClientsCollection, getClient, ObjectId } = require('../config/db');
 const { 
   formatInvoiceNumber, 
   parseInvoiceNumber, 
