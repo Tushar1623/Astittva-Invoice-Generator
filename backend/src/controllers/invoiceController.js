@@ -189,12 +189,16 @@ async function getInvoiceById(req, res) {
  */
 async function getNextNumber(req, res) {
   try {
-    const { clientName = '', date } = req.query;
+    const { clientName = '', customerName = '', date } = req.query;
     const invDate = date ? new Date(date) : new Date();
     const year = invDate.getFullYear();
     const month = invDate.getMonth() + 1;
 
-    const peek = await peekNextNumber(clientName, year, month);
+    const nameToUse = (clientName || '').trim() || 
+      (customerName && customerName.trim() !== 'NK Realtors Private Limited' ? customerName.trim() : '') || 
+      (customerName || '').trim();
+
+    const peek = await peekNextNumber(nameToUse, year, month);
     res.json({ success: true, ...peek });
   } catch (err) {
     console.error('[InvoiceController] getNextNumber error:', err);
@@ -216,9 +220,13 @@ async function createInvoice(req, res) {
     let invoiceNumber = data.invoiceNumber;
     let serialNumber = data.serialNumber;
 
+    const nameToUse = (data.clientName || '').trim() || 
+      (data.customerName && data.customerName.trim() !== 'NK Realtors Private Limited' ? data.customerName.trim() : '') || 
+      (data.customerName || '').trim();
+
     // Allocate atomic sequential number if issuing new invoice
     if (!invoiceNumber || data.allocateNewNumber) {
-      const allocated = await allocateNextInvoiceNumber(data.clientName, year, month);
+      const allocated = await allocateNextInvoiceNumber(nameToUse, year, month);
       invoiceNumber = allocated.invoiceNumber;
       serialNumber = allocated.serialNumber;
     } else {

@@ -68,8 +68,8 @@ export const api = {
     return await res.json();
   },
 
-  async peekNextNumber(clientName = '', date = '') {
-    const query = new URLSearchParams({ clientName, date }).toString();
+  async peekNextNumber(clientName = '', date = '', customerName = '') {
+    const query = new URLSearchParams({ clientName, date, customerName }).toString();
     const res = await fetchWithTimeout(`${getBaseUrl()}/invoices/next-number?${query}`, {
       headers: getAuthHeaders()
     });

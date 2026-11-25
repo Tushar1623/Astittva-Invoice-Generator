@@ -88,22 +88,38 @@ export default function InvoiceForm({
   const [previewNumber, setPreviewNumber] = useState('');
   const [loadingNumber, setLoadingNumber] = useState(false);
 
-  // Fetch real-time preview of next number from backend
+  // Helper to extract effective client name for prefixing invoice number
+  const getEffectiveClientName = (client, customer) => {
+    const cName = (client || '').trim();
+    if (cName) return cName;
+    const custName = (customer || '').trim();
+    if (custName && custName !== 'NK Realtors Private Limited') return custName;
+    return custName || '';
+  };
+
+  // Synchronize Anticipated Number and Invoice Number whenever clientName, customerName, or invoiceDate changes
   useEffect(() => {
     let isMounted = true;
-    async function fetchNext() {
-      if (isEditing && formData.invoiceNumber) {
+    if (isEditing) {
+      if (formData.invoiceNumber) {
         setPreviewNumber(formData.invoiceNumber);
-        return;
       }
+      return;
+    }
+
+    const effectiveName = getEffectiveClientName(formData.clientName, formData.customerName);
+
+    async function fetchNext() {
       setLoadingNumber(true);
       try {
-        const res = await api.peekNextNumber(formData.clientName, formData.invoiceDate);
+        const res = await api.peekNextNumber(effectiveName, formData.invoiceDate, formData.customerName);
         if (isMounted && res.success) {
           setPreviewNumber(res.invoiceNumber);
-          if (!formData.invoiceNumber) {
-            setFormData(prev => ({ ...prev, invoiceNumber: res.invoiceNumber }));
-          }
+          setFormData(prev => ({
+            ...prev,
+            invoiceNumber: res.invoiceNumber,
+            autoAllocate: true
+          }));
         }
       } catch (err) {
         console.warn('Could not peek next invoice number:', err.message);
@@ -111,9 +127,47 @@ export default function InvoiceForm({
         if (isMounted) setLoadingNumber(false);
       }
     }
+
     fetchNext();
     return () => { isMounted = false; };
-  }, [formData.clientName, formData.invoiceDate, isEditing]);
+  }, [formData.clientName, formData.customerName, formData.invoiceDate, isEditing]);
+
+  // Instant real-time synchronization on keystroke
+  const handleClientNameChange = (val) => {
+    setFormData(prev => {
+      const effective = val.trim();
+      const currentFull = prev.invoiceNumber || previewNumber || '';
+      const coreMatch = currentFull.match(/(\d{2,4}\/\d{1,2}\/\d{2,4})$/);
+      const coreSeq = coreMatch ? coreMatch[1] : '';
+      const syncd = coreSeq ? (effective ? `${effective} ${coreSeq}` : coreSeq) : currentFull;
+      if (syncd && !isEditing) {
+        setPreviewNumber(syncd);
+      }
+      return {
+        ...prev,
+        clientName: val,
+        invoiceNumber: !isEditing && syncd ? syncd : prev.invoiceNumber
+      };
+    });
+  };
+
+  const handleCustomerNameChange = (val) => {
+    setFormData(prev => {
+      const effective = getEffectiveClientName(prev.clientName, val);
+      const currentFull = prev.invoiceNumber || previewNumber || '';
+      const coreMatch = currentFull.match(/(\d{2,4}\/\d{1,2}\/\d{2,4})$/);
+      const coreSeq = coreMatch ? coreMatch[1] : '';
+      const syncd = coreSeq ? (effective ? `${effective} ${coreSeq}` : coreSeq) : currentFull;
+      if (syncd && !isEditing) {
+        setPreviewNumber(syncd);
+      }
+      return {
+        ...prev,
+        customerName: val,
+        invoiceNumber: !isEditing && syncd ? syncd : prev.invoiceNumber
+      };
+    });
+  };
 
   // Financial Calculation State
   const [calculation, setCalculation] = useState(() => {
@@ -184,13 +238,17 @@ export default function InvoiceForm({
 
   const handleManualRegenerate = async () => {
     try {
-      const res = await api.peekNextNumber(formData.clientName, formData.invoiceDate);
+      setLoadingNumber(true);
+      const effectiveName = getEffectiveClientName(formData.clientName, formData.customerName);
+      const res = await api.peekNextNumber(effectiveName, formData.invoiceDate, formData.customerName);
       if (res.success) {
-        setFormData(prev => ({ ...prev, invoiceNumber: res.invoiceNumber }));
+        setFormData(prev => ({ ...prev, invoiceNumber: res.invoiceNumber, autoAllocate: true }));
         setPreviewNumber(res.invoiceNumber);
       }
     } catch (err) {
-      console.warn(err);
+      console.warn('Manual regenerate error:', err);
+    } finally {
+      setLoadingNumber(false);
     }
   };
 
@@ -268,7 +326,11 @@ export default function InvoiceForm({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span className="badge badge-gold">
               <span>Anticipated Number:</span>
-              <strong className="font-mono">{loadingNumber ? 'Calculating...' : previewNumber || '—'}</strong>
+              <strong className="font-mono">
+                {loadingNumber && !formData.invoiceNumber && !previewNumber
+                  ? 'Calculating...'
+                  : (formData.invoiceNumber || previewNumber || '—')}
+              </strong>
             </span>
           </div>
         </div>
@@ -288,18 +350,25 @@ export default function InvoiceForm({
               <label className="form-label required">
                 <span>Invoice Number</span>
                 <span style={{ fontSize: '0.68rem', color: 'var(--gold-600)', textTransform: 'none' }}>
-                  Format: Client Name XXX/MM/YYYY
+                  Auto-Synchronized
                 </span>
               </label>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <input
                   type="text"
                   required
-                  value={formData.invoiceNumber}
-                  onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value, autoAllocate: false })}
+                  readOnly
+                  value={formData.invoiceNumber || previewNumber || ''}
                   placeholder="e.g. Aparajita Das 009/11/2026"
                   className="form-input font-mono"
-                  style={{ fontWeight: 700 }}
+                  style={{
+                    fontWeight: 700,
+                    backgroundColor: 'var(--slate-100)',
+                    cursor: 'not-allowed',
+                    color: 'var(--slate-900)',
+                    border: '1px solid var(--border-color)'
+                  }}
+                  title="Invoice number is automatically synchronized with the Anticipated Number."
                 />
                 <button
                   type="button"
@@ -308,11 +377,12 @@ export default function InvoiceForm({
                   title="Refresh number from database counter"
                   style={{ padding: '0.5rem 0.75rem' }}
                 >
-                  <RefreshCw size={14} />
+                  <RefreshCw size={14} className={loadingNumber ? 'spin' : ''} />
                 </button>
               </div>
-              <span className="form-helper-text">
-                {formData.autoAllocate ? 'Atomic sequence allocated upon issue.' : 'Custom number manually specified.'}
+              <span className="form-helper-text" style={{ color: 'var(--slate-500)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Sparkles size={12} color="var(--gold-600)" />
+                <span>Synchronized automatically with Anticipated Number (Client Name + XXX/MM/YYYY).</span>
               </span>
             </div>
 
@@ -384,7 +454,7 @@ export default function InvoiceForm({
                   type="text"
                   required
                   value={formData.customerName}
-                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                  onChange={(e) => handleCustomerNameChange(e.target.value)}
                   placeholder="e.g. NK Realtors Private Limited"
                   className="form-input has-icon"
                   style={{ fontWeight: 600 }}
@@ -457,7 +527,7 @@ export default function InvoiceForm({
                   type="text"
                   required
                   value={formData.clientName}
-                  onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+                  onChange={(e) => handleClientNameChange(e.target.value)}
                   placeholder="e.g. Aparajita Das"
                   className="form-input has-icon"
                 />
