@@ -1,7 +1,23 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+
+// 1. Load environment variables before dependent services initialize
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
+require('dotenv').config({ path: path.join(process.cwd(), '.env') });
+
+// 2. Validate environment configuration before dependent routes and services load
+const { validateSigningEnvironment } = require('./services/signingSecrets');
+
+try {
+  validateSigningEnvironment();
+} catch (err) {
+  console.error('\n' + '='.repeat(80));
+  console.error('❌ RENDER / BACKEND STARTUP CONFIGURATION ERROR:');
+  console.error(err.message);
+  console.error('='.repeat(80) + '\n');
+  process.exit(1);
+}
 
 const { connectToDatabase } = require('./config/db');
 const authRoutes = require('./routes/authRoutes');

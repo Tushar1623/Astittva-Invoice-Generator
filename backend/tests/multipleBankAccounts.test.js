@@ -216,6 +216,7 @@ async function runBankAccountsTests() {
   console.log('\n================================================================');
   console.log(' ALL 10 MULTIPLE BANK ACCOUNTS CHECKS PASSED SUCCESSFULLY!       ');
   console.log('================================================================\n');
+  process.exit(0);
 }
 
 runBankAccountsTests().catch(err => {

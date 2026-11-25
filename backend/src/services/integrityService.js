@@ -1,9 +1,7 @@
 const crypto = require('crypto');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
-const { getSigningSecret } = require('./signingSecrets');
-
-const INVOICE_SIGNING_SECRET = getSigningSecret('INVOICE_SIGNING_SECRET');
+const { getSigningSecret, getVerificationSecrets } = require('./signingSecrets');
 
 function sortKeysRecursively(value) {
   if (Array.isArray(value)) {
@@ -83,9 +81,11 @@ function computeInvoiceHash(inv) {
 
 /**
  * Computes server-side HMAC-SHA256 digital signature of the invoice hash.
+ * Uses the active INVOICE_SIGNING_SECRET by default, or an explicit secret for verification.
  */
-function computeInvoiceSignature(invoiceHash) {
-  return crypto.createHmac('sha256', INVOICE_SIGNING_SECRET).update(invoiceHash).digest('hex');
+function computeInvoiceSignature(invoiceHash, secret) {
+  const signingKey = secret || getSigningSecret('INVOICE_SIGNING_SECRET');
+  return crypto.createHmac('sha256', signingKey).update(invoiceHash).digest('hex');
 }
 
 /**
@@ -135,11 +135,11 @@ async function verifyInvoiceIntegrity(inv, gridFsBucket = null) {
     dataHashMatch = false;
   }
 
-  // 2. HMAC Signature Verification
+  // 2. HMAC Signature Verification (checks active key and authorized historical keys)
   let signatureValid = false;
   if (inv.signature && storedHash) {
-    const expectedSig = computeInvoiceSignature(storedHash);
-    signatureValid = (inv.signature === expectedSig);
+    const allowedSecrets = getVerificationSecrets('INVOICE_SIGNING_SECRET');
+    signatureValid = allowedSecrets.some(sec => computeInvoiceSignature(storedHash, sec) === inv.signature);
   }
 
   // 3. GridFS Receipt File Check (if imported)

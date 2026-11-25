@@ -2,9 +2,8 @@ const crypto = require('crypto');
 const path = require('path');
 const { getAuditLogsCollection } = require('../config/db');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
-const { getSigningSecret } = require('./signingSecrets');
+const { getSigningSecret, getVerificationSecrets } = require('./signingSecrets');
 
-const AUDIT_SIGNING_SECRET = getSigningSecret('AUDIT_SIGNING_SECRET');
 const GENESIS_PREVIOUS_HASH = '0'.repeat(64);
 
 /**
@@ -28,9 +27,11 @@ function computeAuditBlockHash(previousHash, eventId, action, entity, entityId, 
 
 /**
  * Computes HMAC-SHA256 signature for an audit block hash.
+ * Uses the active AUDIT_SIGNING_SECRET by default, or an explicit secret for verification.
  */
-function computeAuditSignature(blockHash) {
-  return crypto.createHmac('sha256', AUDIT_SIGNING_SECRET).update(blockHash).digest('hex');
+function computeAuditSignature(blockHash, secret) {
+  const signingKey = secret || getSigningSecret('AUDIT_SIGNING_SECRET');
+  return crypto.createHmac('sha256', signingKey).update(blockHash).digest('hex');
 }
 
 /**
@@ -158,9 +159,10 @@ async function verifyAuditChain() {
         };
       }
 
-      // 3. Verify HMAC signature
-      const expectedSignature = computeAuditSignature(log.currentHash);
-      if (log.signature && log.signature !== expectedSignature) {
+      // 3. Verify HMAC signature (checks active key and authorized historical keys)
+      const allowedSecrets = getVerificationSecrets('AUDIT_SIGNING_SECRET');
+      const signatureValid = allowedSecrets.some(sec => computeAuditSignature(log.currentHash, sec) === log.signature);
+      if (log.signature && !signatureValid) {
         return {
           verified: false,
           status: 'SIGNATURE_INVALID',
