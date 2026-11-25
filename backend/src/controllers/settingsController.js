@@ -1,5 +1,6 @@
 const { getCompanySettingsCollection } = require('../config/db');
 const { logAuditAction } = require('../services/auditService');
+const { CONFIGURED_BANK_ACCOUNTS, getDefaultBankAccount } = require('../config/bankAccounts');
 
 const defaultSettings = {
   companyName: 'ASTITTVA MARKETING Pvt Ltd',
@@ -15,7 +16,8 @@ const defaultSettings = {
   accountHolder: 'ASTITTVA MARKETING Pvt Ltd',
   defaultHsn: '1164',
   defaultCgstRate: 9,
-  defaultSgstRate: 9
+  defaultSgstRate: 9,
+  bankAccounts: CONFIGURED_BANK_ACCOUNTS
 };
 
 async function getSettings(req, res) {
@@ -25,6 +27,10 @@ async function getSettings(req, res) {
     if (!doc) {
       doc = { _id: 'global_settings', ...defaultSettings, createdAt: new Date() };
       await col.insertOne(doc);
+    } else if (!doc.bankAccounts || !Array.isArray(doc.bankAccounts) || doc.bankAccounts.length === 0) {
+      // Ensure bankAccounts are populated with configured accounts
+      doc.bankAccounts = CONFIGURED_BANK_ACCOUNTS;
+      await col.updateOne({ _id: 'global_settings' }, { $set: { bankAccounts: CONFIGURED_BANK_ACCOUNTS } });
     }
     res.json({ success: true, settings: doc });
   } catch (err) {

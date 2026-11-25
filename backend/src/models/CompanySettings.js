@@ -1,5 +1,20 @@
 const mongoose = require('mongoose');
 
+const { CONFIGURED_BANK_ACCOUNTS, getDefaultBankAccount } = require('../config/bankAccounts');
+
+const BankAccountItemSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  key: { type: String },
+  isDefault: { type: Boolean, default: false },
+  bankName: { type: String, required: true },
+  accountNumber: { type: String, required: true },
+  ifsc: { type: String, required: true },
+  ifscCode: { type: String },
+  accountHolder: { type: String, required: true },
+  accountHolderName: { type: String },
+  branch: { type: String, default: '' }
+}, { _id: false });
+
 const BankDetailsSchema = new mongoose.Schema({
   bankName: { type: String, default: 'AU Small Finance Bank' },
   accountNumber: { type: String, default: '2602262416089178' },
@@ -52,6 +67,10 @@ const CompanySettingsSchema = new mongoose.Schema({
   bank: {
     type: BankDetailsSchema,
     default: () => ({})
+  },
+  bankAccounts: {
+    type: [BankAccountItemSchema],
+    default: () => CONFIGURED_BANK_ACCOUNTS
   },
   logoUrl: {
     type: String,

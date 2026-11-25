@@ -12,6 +12,16 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
   const calc = invoice.financials;
   const words = numberToWords(calc.finalTotal);
 
+  // Bank Account details (prioritize invoice.bankDetails, fallback to comp fields)
+  const bank = invoice.bankDetails || comp?.bankDetails || {
+    bankName: comp?.bankName || 'AU Small Finance Bank',
+    accountNumber: comp?.accountNumber || '2602262416089178',
+    ifsc: comp?.ifsc || 'AUBL0002624',
+    ifscCode: comp?.ifsc || 'AUBL0002624',
+    accountHolder: comp?.accountHolder || comp?.accountHolderName || 'ASTITTVA MARKETING Pvt Ltd',
+    accountHolderName: comp?.accountHolderName || comp?.accountHolder || 'ASTITTVA MARKETING Pvt Ltd'
+  };
+
   const handleDownload = async () => {
     try {
       setDownloading(true);
@@ -254,10 +264,10 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
 
                 <div className="doc-bar">Bank Details</div>
                 <div className="doc-bank-content">
-                  <div><b>Bank Name :</b> {comp.bankName}</div>
-                  <div><b>Account No. :</b> {comp.accountNumber}</div>
-                  <div><b>IFSC :</b> {comp.ifsc}</div>
-                  <div><b>Account Holder :</b> {comp.accountHolder}</div>
+                  <div><b>Bank Name :</b> {bank.bankName}</div>
+                  <div><b>Account Holder Name :</b> {bank.accountHolder || bank.accountHolderName}</div>
+                  <div><b>Account Number :</b> {bank.accountNumber}</div>
+                  <div><b>IFSC Code :</b> {bank.ifsc || bank.ifscCode}</div>
                 </div>
               </div>
 

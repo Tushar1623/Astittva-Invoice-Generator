@@ -259,56 +259,118 @@ export default function SettingsModal({
           {/* TAB 2: BANK DETAILS */}
           {activeTab === 'bank' && (
             <div>
-              <div className="form-grid" style={{ marginBottom: '1.25rem' }}>
-                <div className="form-group col-span-2">
-                  <label className="form-label required">Bank Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.bankName}
-                    onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                    placeholder="AU Small Finance Bank"
-                    className="form-input"
-                    style={{ fontWeight: 600 }}
-                  />
+              <div style={{ marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--slate-800)', marginBottom: '0.35rem' }}>
+                  Configured Settlement Bank Accounts
+                </h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>
+                  ASTITTVA MARKETING supports multiple active bank accounts. Choose which account receives payment when creating or issuing invoices.
+                </p>
+              </div>
+
+              {/* Multiple Bank Accounts List */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
+                {/* Account 1 Card */}
+                <div style={{
+                  border: '1.5px solid var(--gold-300)',
+                  background: 'var(--gold-50)',
+                  borderRadius: '10px',
+                  padding: '0.85rem 1rem',
+                  position: 'relative'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--gold-900)' }}>
+                      AU Small Finance Bank
+                    </span>
+                    <span className="badge badge-gold" style={{ fontSize: '0.65rem' }}>Default (Account 1)</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--slate-700)', lineHeight: 1.6 }}>
+                    <div><strong>A/C Holder:</strong> ASTITTVA MARKETING Pvt Ltd</div>
+                    <div><strong>A/C No.:</strong> <span className="font-mono" style={{ fontWeight: 700 }}>2602262416089178</span></div>
+                    <div><strong>IFSC:</strong> <span className="font-mono" style={{ fontWeight: 700 }}>AUBL0002624</span></div>
+                    <div><strong>Branch:</strong> Kolkata Main Branch</div>
+                  </div>
                 </div>
 
-                <div className="form-group col-span-2">
-                  <label className="form-label required">Account Holder Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.accountHolder}
-                    onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
-                    placeholder="ASTITTVA MARKETING Pvt Ltd"
-                    className="form-input"
-                  />
+                {/* Account 2 Card */}
+                <div style={{
+                  border: '1.5px solid var(--slate-200)',
+                  background: 'var(--white)',
+                  borderRadius: '10px',
+                  padding: '0.85rem 1rem',
+                  position: 'relative'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--slate-900)' }}>
+                      ICICI Bank Limited
+                    </span>
+                    <span className="badge badge-secondary" style={{ fontSize: '0.65rem' }}>Account 2</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--slate-700)', lineHeight: 1.6 }}>
+                    <div><strong>A/C Holder:</strong> ASTITTVA MARKETING PRIVATE LIMITED</div>
+                    <div><strong>A/C No.:</strong> <span className="font-mono" style={{ fontWeight: 700 }}>458805000106</span></div>
+                    <div><strong>IFSC:</strong> <span className="font-mono" style={{ fontWeight: 700 }}>ICIC0004588</span></div>
+                    <div><strong>Branch:</strong> Kolkata Branch</div>
+                  </div>
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label className="form-label required">Bank Account Number</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.accountNumber}
-                    onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                    placeholder="2602262416089178"
-                    className="form-input font-mono"
-                    style={{ fontWeight: 700 }}
-                  />
-                </div>
+              {/* Edit Account 1 Primary Fields */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                <h5 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--slate-700)', marginBottom: '0.75rem' }}>
+                  Edit Default Bank Account (Account 1) Details:
+                </h5>
+                <div className="form-grid" style={{ marginBottom: '1.25rem' }}>
+                  <div className="form-group col-span-2">
+                    <label className="form-label required">Bank Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.bankName}
+                      onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                      placeholder="AU Small Finance Bank"
+                      className="form-input"
+                      style={{ fontWeight: 600 }}
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label className="form-label required">IFSC Code</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.ifsc}
-                    onChange={(e) => setFormData({ ...formData, ifsc: e.target.value.toUpperCase() })}
-                    placeholder="AUBL0002624"
-                    className="form-input font-mono"
-                    style={{ fontWeight: 700 }}
-                  />
+                  <div className="form-group col-span-2">
+                    <label className="form-label required">Account Holder Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.accountHolder}
+                      onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
+                      placeholder="ASTITTVA MARKETING Pvt Ltd"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label required">Bank Account Number</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.accountNumber}
+                      onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                      placeholder="2602262416089178"
+                      className="form-input font-mono"
+                      style={{ fontWeight: 700 }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label required">IFSC Code</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.ifsc}
+                      onChange={(e) => setFormData({ ...formData, ifsc: e.target.value.toUpperCase() })}
+                      placeholder="AUBL0002624"
+                      className="form-input font-mono"
+                      style={{ fontWeight: 700 }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -322,7 +384,7 @@ export default function SettingsModal({
                 lineHeight: 1.5
               }}>
                 <div style={{ fontWeight: 700, color: 'var(--slate-800)', marginBottom: '0.25rem' }}>
-                  Bank Details Preview (as printed on invoice footer):
+                  Default Bank Details Preview (Account 1 printed when no custom bank is chosen):
                 </div>
                 <div><b>Bank Name :</b> {formData.bankName}</div>
                 <div><b>Account No. :</b> {formData.accountNumber}</div>

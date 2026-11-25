@@ -9,6 +9,90 @@ const {
 } = require('../services/counterService');
 const { calculateFinancials } = require('../services/calculationService');
 const { logAuditAction } = require('../services/auditService');
+const { 
+  getBankAccountById, 
+  getDefaultBankAccount, 
+  validateBankAccount,
+  CONFIGURED_BANK_ACCOUNTS 
+} = require('../config/bankAccounts');
+
+/**
+ * Resolve and validate selected bank account for invoice snapshot.
+ */
+function resolveBankAccount(data, defaultFallback = true) {
+  const requestedId = data.selectedBankAccountId || data.bankAccountId;
+  if (requestedId) {
+    const matched = getBankAccountById(requestedId);
+    if (!matched) {
+      return { 
+        error: `Invalid bank account selected: "${requestedId}". Supported accounts: account_1 (AU Small Finance Bank), account_2 (ICICI Bank Limited).` 
+      };
+    }
+    return {
+      snapshot: {
+        accountId: matched.id,
+        bankName: matched.bankName,
+        accountNumber: matched.accountNumber,
+        ifsc: matched.ifsc,
+        ifscCode: matched.ifsc,
+        accountHolder: matched.accountHolder,
+        accountHolderName: matched.accountHolder,
+        branch: matched.branch || ''
+      }
+    };
+  }
+
+  if (data.bankDetails && typeof data.bankDetails === 'object') {
+    const val = validateBankAccount(data.bankDetails);
+    if (!val.valid) {
+      return { error: val.error };
+    }
+    return { snapshot: val.normalized };
+  }
+
+  if (defaultFallback) {
+    const def = getDefaultBankAccount();
+    return {
+      snapshot: {
+        accountId: def.id,
+        bankName: def.bankName,
+        accountNumber: def.accountNumber,
+        ifsc: def.ifsc,
+        ifscCode: def.ifsc,
+        accountHolder: def.accountHolder,
+        accountHolderName: def.accountHolder,
+        branch: def.branch || ''
+      }
+    };
+  }
+
+  return { snapshot: null };
+}
+
+/**
+ * Ensures legacy/historical invoices without explicit bankDetails fallback to Bank Account 1.
+ */
+function ensureInvoiceBankDetails(inv) {
+  if (!inv) return inv;
+  if (!inv.bankDetails || !inv.bankDetails.bankName) {
+    const def = getDefaultBankAccount();
+    return {
+      ...inv,
+      selectedBankAccountId: inv.selectedBankAccountId || 'account_1',
+      bankDetails: {
+        accountId: 'account_1',
+        bankName: def.bankName,
+        accountNumber: def.accountNumber,
+        ifsc: def.ifsc,
+        ifscCode: def.ifsc,
+        accountHolder: def.accountHolder,
+        accountHolderName: def.accountHolder,
+        branch: def.branch || ''
+      }
+    };
+  }
+  return inv;
+}
 
 /**
  * List invoices with filtering, searching, and pagination.
@@ -60,10 +144,12 @@ async function getInvoices(req, res) {
       .sort({ year: -1, month: -1, serialNumber: -1, createdAt: -1 })
       .toArray();
 
+    const formattedList = list.map(ensureInvoiceBankDetails);
+
     res.json({
       success: true,
-      count: list.length,
-      invoices: list
+      count: formattedList.length,
+      invoices: formattedList
     });
   } catch (err) {
     console.error('[InvoiceController] getInvoices error:', err);
@@ -91,7 +177,7 @@ async function getInvoiceById(req, res) {
       return res.status(404).json({ success: false, error: 'Invoice not found.' });
     }
 
-    res.json({ success: true, invoice });
+    res.json({ success: true, invoice: ensureInvoiceBankDetails(invoice) });
   } catch (err) {
     console.error('[InvoiceController] getInvoiceById error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -161,6 +247,13 @@ async function createInvoice(req, res) {
       igstRate: data.igstRate || 0
     });
 
+    // Resolve and validate bank account selection (defaults to Bank Account 1)
+    const bankResolution = resolveBankAccount(data, true);
+    if (bankResolution.error) {
+      return res.status(400).json({ success: false, error: bankResolution.error });
+    }
+    const bankSnapshot = bankResolution.snapshot;
+
     const newInvoice = {
       invoiceNumber,
       serialNumber: serialNumber || 1,
@@ -182,6 +275,8 @@ async function createInvoice(req, res) {
       quantity: financials.quantity,
       pricePerUnit: financials.pricePerUnit,
       financials,
+      bankDetails: bankSnapshot,
+      selectedBankAccountId: bankSnapshot.accountId,
       companySnapshot: data.companySnapshot || null,
       status: 'active',
       isImported: Boolean(data.isImported),
@@ -264,6 +359,16 @@ async function updateInvoice(req, res) {
       igstRate: data.igstRate !== undefined ? data.igstRate : (existing.financials?.igstRate || 0)
     });
 
+    // Validate and update bank details only if explicitly provided in update payload
+    let bankSnapshot = null;
+    if (data.selectedBankAccountId !== undefined || data.bankAccountId !== undefined || data.bankDetails !== undefined) {
+      const bankResolution = resolveBankAccount(data, false);
+      if (bankResolution.error) {
+        return res.status(400).json({ success: false, error: bankResolution.error });
+      }
+      bankSnapshot = bankResolution.snapshot;
+    }
+
     const updateFields = {
       ...(data.invoiceNumber && { invoiceNumber: data.invoiceNumber }),
       ...(data.invoiceDate && { invoiceDate: data.invoiceDate }),
@@ -279,6 +384,10 @@ async function updateInvoice(req, res) {
       ...(data.brokeragePercentage !== undefined && { brokeragePercentage: Number(data.brokeragePercentage) }),
       ...(data.itemDescription !== undefined && { itemDescription: data.itemDescription }),
       ...(data.hsnSac && { hsnSac: data.hsnSac }),
+      ...(bankSnapshot && {
+        bankDetails: bankSnapshot,
+        selectedBankAccountId: bankSnapshot.accountId
+      }),
       quantity: financials.quantity,
       pricePerUnit: financials.pricePerUnit,
       financials,

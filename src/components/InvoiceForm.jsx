@@ -14,10 +14,12 @@ import {
   User,
   Hash,
   RefreshCw,
-  Edit2
+  Edit2,
+  Landmark
 } from 'lucide-react';
 import { calculateInvoiceFinancials, generateItemDescription, formatINR } from '../utils/calculations';
 import { api } from '../services/api';
+import { defaultBankAccounts } from '../data/companyDetails';
 import Calculator from './Calculator';
 
 export default function InvoiceForm({ 
@@ -29,10 +31,23 @@ export default function InvoiceForm({
 }) {
   const isEditing = Boolean(initialInvoice?._id || initialInvoice?.id);
 
+  // Available bank accounts (Account 1: AU Small Finance Bank, Account 2: ICICI Bank Limited)
+  const availableBankAccounts = (companyDetails?.bankAccounts && companyDetails.bankAccounts.length > 0)
+    ? companyDetails.bankAccounts
+    : defaultBankAccounts;
+
+  const defaultAccount = availableBankAccounts.find(a => a.isDefault) || availableBankAccounts[0];
+
   // Form State
   const [formData, setFormData] = useState(() => {
     if (initialInvoice) {
-      return { ...initialInvoice };
+      const initialBankDetails = initialInvoice.bankDetails || defaultAccount;
+      const initialBankId = initialInvoice.selectedBankAccountId || initialBankDetails.accountId || defaultAccount.id;
+      return { 
+        ...initialInvoice,
+        selectedBankAccountId: initialBankId,
+        bankDetails: initialBankDetails
+      };
     }
     const today = new Date().toISOString().slice(0, 10);
     return {
@@ -62,7 +77,11 @@ export default function InvoiceForm({
       quantity: 1,
       pricePerUnit: 103448,
       cgstRate: companyDetails?.defaultCgstRate || 9,
-      sgstRate: companyDetails?.defaultSgstRate || 9
+      sgstRate: companyDetails?.defaultSgstRate || 9,
+
+      // Bank Account Selection (Default Account 1: AU Small Finance Bank)
+      selectedBankAccountId: defaultAccount.id,
+      bankDetails: defaultAccount
     };
   });
 
@@ -175,6 +194,26 @@ export default function InvoiceForm({
     }
   };
 
+  const handleBankAccountSelect = (accountId) => {
+    const chosen = availableBankAccounts.find(a => a.id === accountId);
+    if (chosen) {
+      setFormData(prev => ({
+        ...prev,
+        selectedBankAccountId: chosen.id,
+        bankDetails: {
+          accountId: chosen.id,
+          bankName: chosen.bankName,
+          accountNumber: chosen.accountNumber,
+          ifsc: chosen.ifsc || chosen.ifscCode,
+          ifscCode: chosen.ifscCode || chosen.ifsc,
+          accountHolder: chosen.accountHolder || chosen.accountHolderName,
+          accountHolderName: chosen.accountHolderName || chosen.accountHolder,
+          branch: chosen.branch || ''
+        }
+      }));
+    }
+  };
+
   const buildCompleteInvoiceObject = () => {
     const finalCalculations = calculateInvoiceFinancials({
       quantity: formData.quantity,
@@ -185,9 +224,17 @@ export default function InvoiceForm({
 
     return {
       ...formData,
+      selectedBankAccountId: formData.selectedBankAccountId || 'account_1',
+      bankDetails: formData.bankDetails,
       allocateNewNumber: !isEditing && formData.autoAllocate,
       financials: finalCalculations,
-      companySnapshot: { ...companyDetails }
+      companySnapshot: { 
+        ...companyDetails,
+        bankName: formData.bankDetails?.bankName || companyDetails?.bankName,
+        accountNumber: formData.bankDetails?.accountNumber || companyDetails?.accountNumber,
+        ifsc: formData.bankDetails?.ifsc || companyDetails?.ifsc,
+        accountHolder: formData.bankDetails?.accountHolder || companyDetails?.accountHolder
+      }
     };
   };
 
@@ -626,6 +673,109 @@ export default function InvoiceForm({
               className="form-textarea font-mono"
               style={{ fontSize: '0.82rem' }}
             />
+          </div>
+        </div>
+
+        {/* SECTION 5: BANK ACCOUNT DETAILS */}
+        <div className="card">
+          <div className="section-badge-header">
+            <span className="section-number-pill">5</span>
+            <span className="section-title-text">Bank Account Details</span>
+          </div>
+
+          <p style={{ fontSize: '0.8rem', color: 'var(--slate-500)', marginBottom: '1rem' }}>
+            Choose which company bank account appears in the Bank Details section of the generated invoice PDF.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+            {availableBankAccounts.map((acc) => {
+              const isSelected = formData.selectedBankAccountId === acc.id;
+              return (
+                <label
+                  key={acc.id}
+                  style={{
+                    display: 'block',
+                    cursor: 'pointer',
+                    border: isSelected ? '2px solid var(--gold-600)' : '1px solid var(--border-color)',
+                    background: isSelected ? 'var(--gold-50)' : 'var(--white)',
+                    boxShadow: isSelected ? '0 0 0 3px rgba(184, 134, 11, 0.15)' : 'none',
+                    borderRadius: '10px',
+                    padding: '1rem 1.15rem',
+                    transition: 'all 0.2s ease',
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="radio"
+                        name="selectedBankAccountId"
+                        value={acc.id}
+                        checked={isSelected}
+                        onChange={() => handleBankAccountSelect(acc.id)}
+                        style={{ accentColor: 'var(--gold-600)', width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: isSelected ? 'var(--gold-900)' : 'var(--slate-900)' }}>
+                        {acc.bankName}
+                      </span>
+                    </div>
+                    {acc.isDefault ? (
+                      <span className="badge badge-gold" style={{ fontSize: '0.65rem' }}>Default (Account 1)</span>
+                    ) : (
+                      <span className="badge badge-secondary" style={{ fontSize: '0.65rem' }}>Account 2</span>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '0.78rem', color: 'var(--slate-700)', lineHeight: 1.6, paddingLeft: '1.5rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--slate-500)' }}>Account Holder:</span>{' '}
+                      <strong>{acc.accountHolder || acc.accountHolderName}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--slate-500)' }}>Account Number:</span>{' '}
+                      <strong className="font-mono" style={{ color: 'var(--slate-900)', fontSize: '0.85rem' }}>{acc.accountNumber}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--slate-500)' }}>IFSC Code:</span>{' '}
+                      <strong className="font-mono">{acc.ifsc || acc.ifscCode}</strong>
+                    </div>
+                    {acc.branch && (
+                      <div>
+                        <span style={{ color: 'var(--slate-500)' }}>Branch:</span> {acc.branch}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          {/* Active selection summary pill */}
+          <div style={{
+            background: 'var(--slate-50)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            fontSize: '0.8rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Landmark size={16} color="var(--gold-600)" />
+              <span>Selected for this Invoice:</span>
+              <strong style={{ color: 'var(--gold-800)' }}>
+                {formData.bankDetails?.bankName || 'AU Small Finance Bank'}
+              </strong>
+              <span className="font-mono text-muted">
+                ({formData.bankDetails?.accountNumber})
+              </span>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: 'var(--slate-500)' }}>
+              IFSC: <strong className="font-mono">{formData.bankDetails?.ifsc || formData.bankDetails?.ifscCode}</strong>
+            </span>
           </div>
         </div>
 

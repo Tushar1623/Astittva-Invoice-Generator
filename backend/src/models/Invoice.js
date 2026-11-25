@@ -15,6 +15,17 @@ const FinancialsSchema = new mongoose.Schema({
   finalTotal: { type: Number, required: true, min: 0 }
 }, { _id: false });
 
+const BankSnapshotSchema = new mongoose.Schema({
+  accountId: { type: String, default: 'account_1' },
+  bankName: { type: String, required: true },
+  accountNumber: { type: String, required: true },
+  ifsc: { type: String, required: true },
+  ifscCode: { type: String },
+  accountHolder: { type: String, required: true },
+  accountHolderName: { type: String },
+  branch: { type: String, default: '' }
+}, { _id: false });
+
 const InvoiceSchema = new mongoose.Schema({
   invoiceNumber: {
     type: String,
@@ -119,6 +130,14 @@ const InvoiceSchema = new mongoose.Schema({
   financials: {
     type: FinancialsSchema,
     required: true
+  },
+  bankDetails: {
+    type: BankSnapshotSchema,
+    default: null
+  },
+  selectedBankAccountId: {
+    type: String,
+    default: 'account_1'
   },
   status: {
     type: String,
