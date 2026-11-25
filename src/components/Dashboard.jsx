@@ -445,20 +445,6 @@ export default function Dashboard({
                         </button>
                       </div>
                     </td>
-                        >
-                          <Copy size={15} color="var(--slate-600)" />
-                        </button>
-
-                        <button
-                          onClick={() => onDeleteInvoice(inv._id || inv.id)}
-                          className="btn-icon-only"
-                          title="Move Invoice to Trash"
-                          style={{ color: 'var(--danger)' }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
