@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  X, 
-  Building, 
-  Landmark, 
-  Shield, 
-  Hash, 
-  Save, 
+import {
+  X,
+  Building,
+  Landmark,
+  Shield,
+  Hash,
+  Save,
   RotateCcw,
   CheckCircle,
   FileText,
@@ -15,15 +15,15 @@ import {
 import { defaultCompanyDetails } from '../data/companyDetails';
 import { getDateTokens, getStoredSequences, setStartingSequence } from '../utils/invoiceNumber';
 
-export default function SettingsModal({ 
-  isOpen, 
-  onClose, 
-  companyDetails, 
-  onSaveDetails 
+export default function SettingsModal({
+  isOpen,
+  onClose,
+  companyDetails,
+  onSaveDetails
 }) {
   const [activeTab, setActiveTab] = useState('company'); // 'company' | 'bank' | 'tax'
   const [formData, setFormData] = useState({ ...companyDetails });
-  
+
   // Starting sequence configuration for current month
   const { key: currentMonthKey } = getDateTokens(new Date());
   const [nextSeqNum, setNextSeqNum] = useState(() => {
@@ -90,8 +90,8 @@ export default function SettingsModal({
               Edit legal headers, bank accounts, default GST rates, and invoice counters.
             </p>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="btn-icon-only"
             style={{ borderRadius: '50%' }}
           >

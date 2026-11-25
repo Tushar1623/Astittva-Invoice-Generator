@@ -40,8 +40,8 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             {onBack && (
-              <button 
-                onClick={onBack} 
+              <button
+                onClick={onBack}
                 className="btn btn-secondary"
                 style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
               >
@@ -67,8 +67,8 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {onEdit && (
-              <button 
-                onClick={() => onEdit(invoice)} 
+              <button
+                onClick={() => onEdit(invoice)}
                 className="btn btn-secondary"
                 style={{ fontSize: '0.82rem' }}
               >
@@ -77,8 +77,8 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
               </button>
             )}
 
-            <button 
-              onClick={printInvoice} 
+            <button
+              onClick={printInvoice}
               className="btn btn-secondary"
               style={{ fontSize: '0.82rem' }}
             >
@@ -86,8 +86,8 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
               <span>Print</span>
             </button>
 
-            <button 
-              onClick={handleDownload} 
+            <button
+              onClick={handleDownload}
               className="btn btn-primary"
               disabled={downloading}
               style={{ fontSize: '0.82rem' }}
@@ -102,11 +102,11 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
       {/* Printable Invoice Container (Strict layout for pixel-perfect PDF rendering) */}
       <div className="invoice-wrapper">
         <div id="invoice-printable-area" className="invoice-doc">
-          
+
           <div className="doc-top-title">Tax Invoice</div>
 
           <div className="doc-bordered-box">
-            
+
             {/* Header: Logo and Company Info */}
             <div className="doc-header-row">
               <div className="doc-header-logo">
