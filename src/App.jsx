@@ -206,6 +206,7 @@ export default function App() {
           <InvoiceForm
             initialInvoice={selectedInvoice}
             companyDetails={companyDetails}
+            lastInvoice={invoices && invoices.length > 0 ? invoices[0] : null}
             onSave={(inv) => handleSaveInvoice(inv, false)}
             onSaveAndPreview={(inv) => handleSaveInvoice(inv, true)}
             onCancel={() => setActiveTab('dashboard')}

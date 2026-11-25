@@ -224,12 +224,8 @@ async function createInvoice(req, res) {
       (data.customerName && data.customerName.trim() !== 'NK Realtors Private Limited' ? data.customerName.trim() : '') || 
       (data.customerName || '').trim();
 
-    // Allocate atomic sequential number if issuing new invoice
-    if (!invoiceNumber || data.allocateNewNumber) {
-      const allocated = await allocateNextInvoiceNumber(nameToUse, year, month);
-      invoiceNumber = allocated.invoiceNumber;
-      serialNumber = allocated.serialNumber;
-    } else {
+    // Determine if user entered a manual custom invoice number
+    if (invoiceNumber && !data.allocateNewNumber) {
       // Validate uniqueness
       const isUsed = await isInvoiceNumberUsed(invoiceNumber);
       if (isUsed) {
@@ -242,8 +238,16 @@ async function createInvoice(req, res) {
       const parsed = parseInvoiceNumber(invoiceNumber);
       if (parsed) {
         serialNumber = parsed.serial;
+        if (!data.clientName && parsed.clientName) {
+          data.clientName = parsed.clientName;
+        }
         await registerImportedSerial(parsed.serial, parsed.month, parsed.year);
       }
+    } else {
+      // Allocate atomic sequential number upon issuance
+      const allocated = await allocateNextInvoiceNumber(nameToUse, year, month);
+      invoiceNumber = allocated.invoiceNumber;
+      serialNumber = allocated.serialNumber;
     }
 
     // Calculate financials accurately

@@ -101,11 +101,34 @@ async function getOrInitCounter(year, month) {
 async function peekNextNumber(clientName, year, month) {
   const counter = await getOrInitCounter(year, month);
   const nextSerial = (counter.highestSerial || 0) + 1;
+
+  // Retrieve the most recently created bill across the system
+  let previousBill = null;
+  try {
+    const invoices = getInvoicesCollection();
+    const lastDoc = await invoices.findOne(
+      { status: { $ne: 'trash' } },
+      { sort: { createdAt: -1, year: -1, month: -1, serialNumber: -1 } }
+    );
+    if (lastDoc) {
+      if (lastDoc.displayInvoiceNumber) {
+        previousBill = lastDoc.displayInvoiceNumber;
+      } else if (lastDoc.clientName && !lastDoc.invoiceNumber.includes(lastDoc.clientName)) {
+        previousBill = `${lastDoc.clientName} ${lastDoc.invoiceNumber}`;
+      } else {
+        previousBill = lastDoc.invoiceNumber;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
   return {
     serial: nextSerial,
     month,
     year,
-    invoiceNumber: formatInvoiceNumber(clientName, nextSerial, month, year)
+    invoiceNumber: formatInvoiceNumber(clientName, nextSerial, month, year),
+    previousBill: previousBill || 'Aparajita Das 008/11/2026'
   };
 }
 

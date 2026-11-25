@@ -25,6 +25,7 @@ import Calculator from './Calculator';
 export default function InvoiceForm({ 
   initialInvoice = null, 
   companyDetails, 
+  lastInvoice = null,
   onSave, 
   onSaveAndPreview, 
   onCancel 
@@ -38,6 +39,19 @@ export default function InvoiceForm({
 
   const defaultAccount = availableBankAccounts.find(a => a.isDefault) || availableBankAccounts[0];
 
+  const computePreviousBill = (lastInv) => {
+    if (lastInv) {
+      if (lastInv.displayInvoiceNumber) return lastInv.displayInvoiceNumber;
+      if (lastInv.clientName && !lastInv.invoiceNumber.includes(lastInv.clientName)) {
+        return `${lastInv.clientName} ${lastInv.invoiceNumber}`;
+      }
+      return lastInv.invoiceNumber;
+    }
+    return 'Aparajita Das 008/11/2026';
+  };
+
+  const [previousBill, setPreviousBill] = useState(() => computePreviousBill(lastInvoice));
+
   // Form State
   const [formData, setFormData] = useState(() => {
     if (initialInvoice) {
@@ -46,7 +60,8 @@ export default function InvoiceForm({
       return { 
         ...initialInvoice,
         selectedBankAccountId: initialBankId,
-        bankDetails: initialBankDetails
+        bankDetails: initialBankDetails,
+        isManualInvoiceNumber: true
       };
     }
     const today = new Date().toISOString().slice(0, 10);
@@ -54,6 +69,7 @@ export default function InvoiceForm({
       // Invoice Details
       invoiceNumber: '',
       autoAllocate: true,
+      isManualInvoiceNumber: false,
       invoiceDate: today,
       placeOfSupply: '19 – West Bengal',
 
@@ -97,7 +113,7 @@ export default function InvoiceForm({
     return custName || '';
   };
 
-  // Synchronize Anticipated Number and Invoice Number whenever clientName, customerName, or invoiceDate changes
+  // Synchronize Previous Bill and suggest next Invoice Number
   useEffect(() => {
     let isMounted = true;
     if (isEditing) {
@@ -115,11 +131,20 @@ export default function InvoiceForm({
         const res = await api.peekNextNumber(effectiveName, formData.invoiceDate, formData.customerName);
         if (isMounted && res.success) {
           setPreviewNumber(res.invoiceNumber);
-          setFormData(prev => ({
-            ...prev,
-            invoiceNumber: res.invoiceNumber,
-            autoAllocate: true
-          }));
+          if (res.previousBill) {
+            setPreviousBill(res.previousBill);
+          }
+          // Pre-fill invoice number if not manually edited by user
+          setFormData(prev => {
+            if (prev.isManualInvoiceNumber && prev.invoiceNumber) {
+              return prev;
+            }
+            return {
+              ...prev,
+              invoiceNumber: res.invoiceNumber,
+              autoAllocate: true
+            };
+          });
         }
       } catch (err) {
         console.warn('Could not peek next invoice number:', err.message);
@@ -132,7 +157,7 @@ export default function InvoiceForm({
     return () => { isMounted = false; };
   }, [formData.clientName, formData.customerName, formData.invoiceDate, isEditing]);
 
-  // Instant real-time synchronization on keystroke
+  // Handle clientName change (updates suggested invoiceNumber if not manually typed)
   const handleClientNameChange = (val) => {
     setFormData(prev => {
       const effective = val.trim();
@@ -146,7 +171,7 @@ export default function InvoiceForm({
       return {
         ...prev,
         clientName: val,
-        invoiceNumber: !isEditing && syncd ? syncd : prev.invoiceNumber
+        invoiceNumber: !prev.isManualInvoiceNumber && !isEditing && syncd ? syncd : prev.invoiceNumber
       };
     });
   };
@@ -164,7 +189,7 @@ export default function InvoiceForm({
       return {
         ...prev,
         customerName: val,
-        invoiceNumber: !isEditing && syncd ? syncd : prev.invoiceNumber
+        invoiceNumber: !prev.isManualInvoiceNumber && !isEditing && syncd ? syncd : prev.invoiceNumber
       };
     });
   };
@@ -280,11 +305,13 @@ export default function InvoiceForm({
       sgstRate: formData.sgstRate
     });
 
+    const isManual = Boolean(formData.isManualInvoiceNumber);
+
     return {
       ...formData,
       selectedBankAccountId: formData.selectedBankAccountId || 'account_1',
       bankDetails: formData.bankDetails,
-      allocateNewNumber: !isEditing && formData.autoAllocate,
+      allocateNewNumber: !isEditing && !isManual && formData.autoAllocate,
       financials: finalCalculations,
       companySnapshot: { 
         ...companyDetails,
@@ -319,17 +346,16 @@ export default function InvoiceForm({
               <span>{isEditing ? `Edit Invoice: ${formData.invoiceNumber}` : 'Create New Tax Invoice'}</span>
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--slate-500)', marginTop: '0.2rem' }}>
-              Numbers are atomically allocated upon invoice issue: <code>Client Name + XXX/MM/YYYY</code>.
+              Reference previous bill and manually enter or customize client name and invoice number: <code>Client Name + XXX/MM/YYYY</code>.
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span className="badge badge-gold">
-              <span>Anticipated Number:</span>
-              <strong className="font-mono">
-                {loadingNumber && !formData.invoiceNumber && !previewNumber
-                  ? 'Calculating...'
-                  : (formData.invoiceNumber || previewNumber || '—')}
+            <span className="badge badge-gold" title="Previously created bill in the system">
+              <FileText size={14} color="var(--gold-600)" />
+              <span>Previous Created Bill:</span>
+              <strong className="font-mono" style={{ color: 'var(--gold-900)' }}>
+                {previousBill || (lastInvoice ? computePreviousBill(lastInvoice) : 'Aparajita Das 008/11/2026')}
               </strong>
             </span>
           </div>
@@ -350,31 +376,35 @@ export default function InvoiceForm({
               <label className="form-label required">
                 <span>Invoice Number</span>
                 <span style={{ fontSize: '0.68rem', color: 'var(--gold-600)', textTransform: 'none' }}>
-                  Auto-Synchronized
+                  (Manually enter or edit client name & invoice number)
                 </span>
               </label>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <input
                   type="text"
                   required
-                  readOnly
-                  value={formData.invoiceNumber || previewNumber || ''}
+                  value={formData.invoiceNumber || ''}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    invoiceNumber: e.target.value,
+                    isManualInvoiceNumber: true,
+                    autoAllocate: false
+                  }))}
                   placeholder="e.g. Aparajita Das 009/11/2026"
                   className="form-input font-mono"
                   style={{
                     fontWeight: 700,
-                    backgroundColor: 'var(--slate-100)',
-                    cursor: 'not-allowed',
+                    backgroundColor: '#ffffff',
                     color: 'var(--slate-900)',
                     border: '1px solid var(--border-color)'
                   }}
-                  title="Invoice number is automatically synchronized with the Anticipated Number."
+                  title="Manually enter or edit the client name and invoice number."
                 />
                 <button
                   type="button"
                   onClick={handleManualRegenerate}
                   className="btn btn-secondary"
-                  title="Refresh number from database counter"
+                  title="Auto-fill next sequential number"
                   style={{ padding: '0.5rem 0.75rem' }}
                 >
                   <RefreshCw size={14} className={loadingNumber ? 'spin' : ''} />
@@ -382,7 +412,7 @@ export default function InvoiceForm({
               </div>
               <span className="form-helper-text" style={{ color: 'var(--slate-500)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Sparkles size={12} color="var(--gold-600)" />
-                <span>Synchronized automatically with Anticipated Number (Client Name + XXX/MM/YYYY).</span>
+                <span>Format: <code>Client Name XXX/MM/YYYY</code>. You can manually enter or edit both client name and invoice number.</span>
               </span>
             </div>
 
