@@ -108,13 +108,13 @@ async function peekNextNumber(clientName, year, month) {
     const invoices = getInvoicesCollection();
     const lastDoc = await invoices.findOne(
       { status: { $ne: 'trash' } },
-      { sort: { createdAt: -1, year: -1, month: -1, serialNumber: -1 } }
+      { sort: { year: -1, month: -1, serialNumber: -1, createdAt: -1 } }
     );
     if (lastDoc) {
-      if (lastDoc.displayInvoiceNumber) {
-        previousBill = lastDoc.displayInvoiceNumber;
-      } else if (lastDoc.clientName && !lastDoc.invoiceNumber.includes(lastDoc.clientName)) {
+      if (lastDoc.clientName && !lastDoc.invoiceNumber.includes(lastDoc.clientName)) {
         previousBill = `${lastDoc.clientName} ${lastDoc.invoiceNumber}`;
+      } else if (lastDoc.displayInvoiceNumber) {
+        previousBill = lastDoc.displayInvoiceNumber;
       } else {
         previousBill = lastDoc.invoiceNumber;
       }

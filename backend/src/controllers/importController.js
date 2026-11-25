@@ -262,12 +262,12 @@ async function verifyImport(req, res) {
 
     let finalInvoiceId;
     if (existingInv) {
+      const { _id, ...invoiceData } = newInvoice;
       await invoices.updateOne(
         { _id: existingInv._id },
         {
           $set: {
-            ...newInvoice,
-            _id: existingInv._id,
+            ...invoiceData,
             status: 'active',
             deletedAt: null,
             updatedAt: new Date()
@@ -277,9 +277,9 @@ async function verifyImport(req, res) {
       finalInvoiceId = existingInv._id;
       newInvoice._id = existingInv._id;
     } else {
-      const insertRes = await invoices.insertOne(newInvoice);
-      finalInvoiceId = insertRes.insertedId;
-      newInvoice._id = insertRes.insertedId;
+      const insertResult = await invoices.insertOne(newInvoice);
+      finalInvoiceId = insertResult.insertedId;
+      newInvoice._id = insertResult.insertedId;
     }
 
     // Update import record status to 'verified'
