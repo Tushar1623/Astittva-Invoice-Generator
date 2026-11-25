@@ -141,10 +141,64 @@ const InvoiceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'trash', 'draft'],
-    default: 'active',
+    enum: ['active', 'finalized', 'draft', 'pending_verification', 'verified', 'cancelled', 'amended', 'trash'],
+    default: 'finalized',
     index: true
   },
+  isLocked: {
+    type: Boolean,
+    default: true,
+    index: true
+  },
+  integrityHash: {
+    type: String,
+    index: true
+  },
+  signature: {
+    type: String
+  },
+  sealedAt: {
+    type: Date
+  },
+  sealedBy: {
+    type: String
+  },
+  finalizedAt: {
+    type: Date
+  },
+  finalizedBy: {
+    type: String
+  },
+  cancelledAt: {
+    type: Date
+  },
+  cancelledBy: {
+    type: String
+  },
+  cancellationReason: {
+    type: String
+  },
+  isAmendment: {
+    type: Boolean,
+    default: false
+  },
+  originalInvoiceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Invoice',
+    default: null
+  },
+  originalInvoiceNumber: {
+    type: String,
+    default: null
+  },
+  amendmentType: {
+    type: String,
+    enum: ['correction', 'credit_note', 'debit_note', null],
+    default: null
+  },
+  amendments: [{
+    type: mongoose.Schema.Types.Mixed
+  }],
   isImported: {
     type: Boolean,
     default: false

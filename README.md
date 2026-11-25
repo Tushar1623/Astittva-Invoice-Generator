@@ -88,6 +88,10 @@ npm run build
 ```
 Creates a standalone production build in `dist/`.
 
+### Backend Signing Secrets
+
+The backend requires `INVOICE_SIGNING_SECRET` and `AUDIT_SIGNING_SECRET`, each at least 32 bytes, in `backend/.env` or its deployment environment. Generate two independent values with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Keep these secrets private and do not commit them.
+
 ---
 
 ## 🏢 Preconfigured Company & Bank Information
