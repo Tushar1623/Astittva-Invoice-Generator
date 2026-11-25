@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const AuditLogSchema = new mongoose.Schema({
+  eventId: {
+    type: String,
+    sparse: true,
+    unique: true,
+    index: true
+  },
   action: {
     type: String,
     required: true,
@@ -22,9 +28,38 @@ const AuditLogSchema = new mongoose.Schema({
     type: String,
     default: 'System'
   },
+  userRole: {
+    type: String,
+    default: 'user'
+  },
+  status: {
+    type: String,
+    enum: ['success', 'rejected', 'failed'],
+    default: 'success'
+  },
   details: {
     type: mongoose.Schema.Types.Mixed,
     default: {}
+  },
+  ip: {
+    type: String,
+    default: null
+  },
+  previousHash: {
+    type: String,
+    default: null,
+    index: true
+  },
+  currentHash: {
+    type: String,
+    default: null,
+    sparse: true,
+    unique: true,
+    index: true
+  },
+  signature: {
+    type: String,
+    default: null
   },
   timestamp: {
     type: Date,
