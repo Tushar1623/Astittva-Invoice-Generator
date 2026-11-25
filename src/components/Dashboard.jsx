@@ -140,18 +140,18 @@ export default function Dashboard({
         <div className="kpi-card">
           <div>
             <div className="kpi-top-row">
-              <span className="kpi-label">Invoices Issued</span>
+              <span className="kpi-label" style={{ fontSize: '0.8rem', color: 'var(--slate-600)', fontWeight: 800 }}>Invoices Issued</span>
               <div className="kpi-icon-box gold">
-                <FileText size={20} />
+                <FileText size={22} />
               </div>
             </div>
             <div className="kpi-value-row">
-              <span className="kpi-value">{totalInvoices}</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--slate-400)', fontWeight: 600 }}>records</span>
+              <span className="kpi-value" style={{ fontSize: '1.9rem', fontWeight: 800 }}>{totalInvoices}</span>
+              <span style={{ fontSize: '0.88rem', color: 'var(--slate-500)', fontWeight: 700 }}>records</span>
             </div>
           </div>
-          <div className="kpi-subtext">
-            <CheckCircle2 size={13} color="var(--success)" />
+          <div className="kpi-subtext" style={{ fontSize: '0.82rem' }}>
+            <CheckCircle2 size={15} color="var(--success)" />
             <span>MongoDB Atlas Persistent Storage</span>
           </div>
         </div>
@@ -160,13 +160,13 @@ export default function Dashboard({
         <div className="kpi-card">
           <div>
             <div className="kpi-top-row">
-              <span className="kpi-label">Latest Invoice #</span>
+              <span className="kpi-label" style={{ fontSize: '0.8rem', color: 'var(--slate-600)', fontWeight: 800 }}>Latest Invoice #</span>
               <div className="kpi-icon-box blue">
-                <Clock size={20} />
+                <Clock size={22} />
               </div>
             </div>
             <div className="kpi-value-row" style={{ overflow: 'hidden' }}>
-              <span className="kpi-value font-mono" style={{ color: 'var(--gold-600)', fontSize: '1.15rem', textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <span className="kpi-value font-mono" style={{ color: 'var(--gold-700)', fontSize: '1.25rem', fontWeight: 800, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                 {latestInvoice}
               </span>
               {latestInvoice !== 'None' && (
@@ -177,17 +177,17 @@ export default function Dashboard({
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    color: copiedNumber === latestInvoice ? 'var(--success)' : 'var(--slate-400)',
-                    padding: '2px',
+                    color: copiedNumber === latestInvoice ? 'var(--success)' : 'var(--slate-500)',
+                    padding: '4px',
                     flexShrink: 0
                   }}
                 >
-                  <Copy size={14} />
+                  <Copy size={16} />
                 </button>
               )}
             </div>
           </div>
-          <div className="kpi-subtext">
+          <div className="kpi-subtext" style={{ fontSize: '0.82rem' }}>
             <span>{copiedNumber === latestInvoice ? 'Copied to clipboard!' : 'Global monthly atomic counter'}</span>
           </div>
         </div>
@@ -196,19 +196,19 @@ export default function Dashboard({
         <div className="kpi-card">
           <div>
             <div className="kpi-top-row">
-              <span className="kpi-label">Total Invoiced Amount</span>
+              <span className="kpi-label" style={{ fontSize: '0.8rem', color: 'var(--slate-600)', fontWeight: 800 }}>Total Invoiced Amount</span>
               <div className="kpi-icon-box green">
-                <TrendingUp size={20} />
+                <TrendingUp size={22} />
               </div>
             </div>
             <div className="kpi-value-row">
-              <span className="kpi-value font-mono">
+              <span className="kpi-value font-mono" style={{ fontSize: '1.85rem', fontWeight: 800 }}>
                 ₹ {formatINR(totalAmount)}
               </span>
             </div>
           </div>
-          <div className="kpi-subtext">
-            <Sparkles size={13} color="var(--gold-500)" />
+          <div className="kpi-subtext" style={{ fontSize: '0.82rem' }}>
+            <Sparkles size={14} color="var(--gold-600)" />
             <span>Base Taxable: ₹ {formatINR(totalTaxable)}</span>
           </div>
         </div>
@@ -217,19 +217,19 @@ export default function Dashboard({
         <div className="kpi-card">
           <div>
             <div className="kpi-top-row">
-              <span className="kpi-label">Total GST Processed</span>
+              <span className="kpi-label" style={{ fontSize: '0.8rem', color: 'var(--slate-600)', fontWeight: 800 }}>Total GST Processed</span>
               <div className="kpi-icon-box purple">
-                <Percent size={18} />
+                <Percent size={20} />
               </div>
             </div>
             <div className="kpi-value-row">
-              <span className="kpi-value font-mono" style={{ color: '#7c3aed' }}>
+              <span className="kpi-value font-mono" style={{ color: '#6d28d9', fontSize: '1.85rem', fontWeight: 800 }}>
                 ₹ {formatINR(totalGST)}
               </span>
             </div>
           </div>
-          <div className="kpi-subtext">
-            <ShieldCheck size={13} color="#7c3aed" />
+          <div className="kpi-subtext" style={{ fontSize: '0.82rem' }}>
+            <ShieldCheck size={15} color="#7c3aed" />
             <span>9% CGST + 9% SGST breakdown</span>
           </div>
         </div>
@@ -337,8 +337,8 @@ export default function Dashboard({
                 {filteredInvoices.map((inv) => (
                   <tr key={inv._id || inv.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span className="badge badge-gold font-mono" style={{ fontWeight: 700, fontSize: '0.8rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <span className="badge badge-gold font-mono" style={{ fontWeight: 800, fontSize: '0.88rem', padding: '0.35rem 0.65rem' }}>
                           {inv.invoiceNumber}
                         </span>
                         <button
@@ -349,85 +349,102 @@ export default function Dashboard({
                             border: 'none',
                             cursor: 'pointer',
                             color: copiedNumber === inv.invoiceNumber ? 'var(--success)' : 'var(--slate-400)',
-                            padding: '2px'
+                            padding: '3px'
                           }}
                         >
-                          <Copy size={12} />
+                          <Copy size={14} />
                         </button>
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--slate-600)', fontSize: '0.8rem' }}>
-                        <Calendar size={13} color="var(--slate-400)" />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--slate-700)', fontSize: '0.88rem', fontWeight: 600 }}>
+                        <Calendar size={14} color="var(--slate-400)" />
                         <span>{inv.invoiceDate ? inv.invoiceDate.split('-').reverse().join('-') : '—'}</span>
                       </div>
                     </td>
                     <td>
                       <div>
-                        <div style={{ fontWeight: 700, color: 'var(--slate-900)' }}>{inv.customerName}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontFamily: 'JetBrains Mono' }}>
+                        <div style={{ fontWeight: 800, color: 'var(--slate-900)', fontSize: '0.94rem' }}>{inv.customerName}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--slate-500)', fontFamily: 'JetBrains Mono', marginTop: '0.1rem' }}>
                           {inv.customerGstin ? `GSTIN: ${inv.customerGstin}` : 'No GSTIN'}
                         </div>
                       </div>
                     </td>
                     <td>
-                      <div style={{ fontSize: '0.82rem' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--slate-800)' }}>{inv.clientName || '—'}</span>
+                      <div style={{ fontSize: '0.88rem' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--slate-900)' }}>{inv.clientName || '—'}</span>
                         {inv.projectName && (
-                          <span style={{ color: 'var(--slate-500)', marginLeft: '0.35rem' }}>
-                            ({inv.projectName} {inv.flatNumber ? `• ${inv.flatNumber}` : ''})
-                          </span>
+                          <div style={{ color: 'var(--slate-500)', fontSize: '0.8rem', marginTop: '0.1rem' }}>
+                            {inv.projectName} {inv.flatNumber ? `• ${inv.flatNumber}` : ''}
+                          </div>
                         )}
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }} className="font-mono">
-                      <span style={{ color: 'var(--slate-600)' }}>
+                      <span style={{ color: 'var(--slate-700)', fontSize: '0.92rem', fontWeight: 600 }}>
                         ₹ {formatINR(inv.financials?.taxableAmount || 0)}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }} className="font-mono">
-                      <span style={{ fontWeight: 800, color: 'var(--slate-900)', fontSize: '0.9rem' }}>
+                      <span style={{ fontWeight: 800, color: 'var(--slate-900)', fontSize: '1.02rem' }}>
                         ₹ {formatINR(inv.financials?.finalTotal || 0)}
                       </span>
                     </td>
                     <td>
                       {inv.isImported ? (
-                        <span className="badge" style={{ background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe' }}>
+                        <span className="badge" style={{ background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', fontWeight: 700, fontSize: '0.76rem' }}>
                           Imported Receipt
                         </span>
                       ) : inv.isHistoricalMigration ? (
-                        <span className="badge" style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}>
+                        <span className="badge" style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', fontWeight: 700, fontSize: '0.76rem' }}>
                           Migrated Record
                         </span>
                       ) : (
-                        <span className="badge badge-success">
+                        <span className="badge badge-success" style={{ fontWeight: 700, fontSize: '0.76rem' }}>
                           <span className="status-dot"></span>
                           <span>Issued</span>
                         </span>
                       )}
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
                         <button
                           onClick={() => onViewInvoice(inv)}
                           className="btn-icon-only"
                           title="Preview & Print Invoice"
+                          style={{ padding: '0.5rem' }}
                         >
-                          <Eye size={15} color="var(--slate-600)" />
+                          <Eye size={17} color="var(--slate-700)" />
                         </button>
 
                         <button
                           onClick={() => onEditInvoice(inv)}
                           className="btn-icon-only"
                           title="Edit Invoice"
+                          style={{ padding: '0.5rem' }}
                         >
-                          <Edit3 size={15} color="var(--slate-600)" />
+                          <Edit3 size={17} color="var(--slate-700)" />
                         </button>
 
                         <button
                           onClick={() => onDuplicateInvoice(inv)}
                           className="btn-icon-only"
                           title="Duplicate as New Invoice"
+                          style={{ padding: '0.5rem' }}
+                        >
+                          <Copy size={17} color="var(--slate-700)" />
+                        </button>
+
+                        <button
+                          onClick={() => onDeleteInvoice(inv)}
+                          className="btn-icon-only"
+                          title="Move to Trash"
+                          style={{ padding: '0.5rem' }}
+                        >
+                          <Trash2 size={17} color="var(--danger)" />
+                        </button>
+                      </div>
+                    </td>
                         >
                           <Copy size={15} color="var(--slate-600)" />
                         </button>

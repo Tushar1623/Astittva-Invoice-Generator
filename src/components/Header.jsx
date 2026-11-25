@@ -39,13 +39,13 @@ export default function Header({
         </div>
 
         {/* Navigation Tabs & Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <nav className="header-nav">
             <button
               onClick={() => setActiveTab('dashboard')}
               className={`nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
             >
-              <LayoutDashboard size={15} />
+              <LayoutDashboard size={17} />
               <span>Dashboard</span>
             </button>
 
@@ -53,7 +53,7 @@ export default function Header({
               onClick={() => setActiveTab('create')}
               className={`nav-btn ${activeTab === 'create' ? 'active' : ''}`}
             >
-              <PlusCircle size={15} />
+              <PlusCircle size={17} />
               <span>Create Invoice</span>
             </button>
 
@@ -61,7 +61,7 @@ export default function Header({
               onClick={() => setActiveTab('history')}
               className={`nav-btn ${activeTab === 'history' ? 'active' : ''}`}
             >
-              <History size={15} />
+              <History size={17} />
               <span>Records</span>
             </button>
           </nav>
@@ -70,10 +70,10 @@ export default function Header({
           <button
             onClick={onOpenImport}
             className="btn btn-secondary"
-            style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
+            style={{ padding: '0.55rem 1.05rem', fontSize: '0.88rem', fontWeight: 700 }}
             title="Import Historical Receipt PDFs and Images"
           >
-            <UploadCloud size={15} color="var(--gold-500)" />
+            <UploadCloud size={17} color="var(--gold-600)" />
             <span>Import Receipts</span>
           </button>
 
@@ -81,20 +81,22 @@ export default function Header({
           <button
             onClick={onOpenTrash}
             className="header-settings-btn"
+            style={{ width: '40px', height: '40px' }}
             title="Manage Trash & Soft-deleted Invoices"
             aria-label="Trash"
           >
-            <Trash2 size={16} />
+            <Trash2 size={18} />
           </button>
 
           {/* Company & Bank Settings */}
           <button
             onClick={onOpenSettings}
             className="header-settings-btn"
+            style={{ width: '40px', height: '40px' }}
             title="Configure Company, Bank & Tax Settings"
             aria-label="Settings"
           >
-            <SettingsIcon size={16} />
+            <SettingsIcon size={18} />
           </button>
         </div>
       </div>

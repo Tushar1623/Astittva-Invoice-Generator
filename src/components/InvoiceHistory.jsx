@@ -97,30 +97,30 @@ export default function InvoiceHistory({
             </div>
             <div>
               <h3 className="card-title" style={{ margin: 0 }}>Invoice Records & History</h3>
-              <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)' }}>
-                {invoices.length} total invoices saved in browser LocalStorage
+              <span style={{ fontSize: '0.84rem', color: 'var(--slate-600)' }}>
+                {invoices.length} total invoice records backed by MongoDB Atlas
               </span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
             <button 
               onClick={handleExportJSON} 
               className="btn btn-secondary" 
-              style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
+              style={{ fontSize: '0.85rem', padding: '0.55rem 1rem', fontWeight: 700 }}
               title="Download all invoice records as JSON backup"
             >
-              <Download size={14} />
+              <Download size={15} />
               <span>Export JSON Backup</span>
             </button>
 
             <button 
               onClick={() => fileInputRef.current?.click()} 
               className="btn btn-secondary" 
-              style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
+              style={{ fontSize: '0.85rem', padding: '0.55rem 1rem', fontWeight: 700 }}
               title="Restore invoice records from JSON file"
             >
-              <Upload size={14} />
+              <Upload size={15} />
               <span>Restore Backup</span>
             </button>
             <input 
@@ -134,35 +134,35 @@ export default function InvoiceHistory({
         </div>
 
         {/* Filter and Summary Bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem', marginBottom: '1.5rem' }}>
           {/* Search Box */}
-          <div style={{ position: 'relative', width: '360px', maxWidth: '100%' }}>
-            <Search size={16} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-400)' }} />
+          <div style={{ position: 'relative', width: '380px', maxWidth: '100%' }}>
+            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-400)' }} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by invoice number, customer, buyer, or project..."
               className="form-input has-icon"
-              style={{ fontSize: '0.82rem', paddingRight: searchTerm ? '30px' : '10px' }}
+              style={{ fontSize: '0.9rem', paddingRight: searchTerm ? '32px' : '12px', paddingLeft: '38px' }}
             />
             {searchTerm && (
               <button 
                 onClick={() => setSearchTerm('')} 
                 style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--slate-400)' }}
               >
-                <X size={14} />
+                <X size={15} />
               </button>
             )}
           </div>
 
           {/* Quick Metrics */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.82rem' }}>
-            <span style={{ color: 'var(--slate-500)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.9rem' }}>
+            <span style={{ color: 'var(--slate-600)' }}>
               Showing: <strong style={{ color: 'var(--slate-900)' }}>{filteredInvoices.length}</strong> records
             </span>
-            <span style={{ color: 'var(--slate-500)' }}>
-              Total Filtered: <strong className="font-mono" style={{ color: 'var(--slate-900)' }}>₹ {formatINR(totalValue)}</strong>
+            <span style={{ color: 'var(--slate-600)' }}>
+              Total Filtered: <strong className="font-mono" style={{ color: 'var(--slate-900)', fontSize: '1.02rem', fontWeight: 800 }}>₹ {formatINR(totalValue)}</strong>
             </span>
           </div>
         </div>
@@ -193,10 +193,10 @@ export default function InvoiceHistory({
               </thead>
               <tbody>
                 {filteredInvoices.map((inv) => (
-                  <tr key={inv.id}>
+                  <tr key={inv._id || inv.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span className="badge badge-gold font-mono" style={{ fontWeight: 700, fontSize: '0.8rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <span className="badge badge-gold font-mono" style={{ fontWeight: 800, fontSize: '0.88rem', padding: '0.35rem 0.65rem' }}>
                           {inv.invoiceNumber}
                         </span>
                         <button
@@ -207,80 +207,83 @@ export default function InvoiceHistory({
                             border: 'none',
                             cursor: 'pointer',
                             color: copiedNumber === inv.invoiceNumber ? 'var(--success)' : 'var(--slate-400)',
-                            padding: '2px'
+                            padding: '3px'
                           }}
                         >
-                          <Copy size={12} />
+                          <Copy size={14} />
                         </button>
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--slate-600)', fontSize: '0.8rem' }}>
-                        <Calendar size={13} color="var(--slate-400)" />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--slate-700)', fontSize: '0.88rem', fontWeight: 600 }}>
+                        <Calendar size={14} color="var(--slate-400)" />
                         <span>{inv.invoiceDate ? inv.invoiceDate.split('-').reverse().join('-') : '—'}</span>
                       </div>
                     </td>
                     <td>
-                      <div style={{ fontWeight: 700, color: 'var(--slate-900)' }}>{inv.customerName}</div>
+                      <div style={{ fontWeight: 800, color: 'var(--slate-900)', fontSize: '0.94rem' }}>{inv.customerName}</div>
                     </td>
                     <td>
-                      <span className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--slate-600)' }}>
+                      <span className="font-mono" style={{ fontSize: '0.82rem', color: 'var(--slate-700)', fontWeight: 600 }}>
                         {inv.customerGstin || '—'}
                       </span>
                     </td>
                     <td>
-                      <div style={{ fontSize: '0.82rem' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--slate-800)' }}>{inv.clientName || '—'}</span>
+                      <div style={{ fontSize: '0.88rem' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--slate-900)' }}>{inv.clientName || '—'}</span>
                         {inv.projectName && (
-                          <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)' }}>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--slate-500)', marginTop: '0.1rem' }}>
                             {inv.projectName} {inv.flatNumber ? `• Unit ${inv.flatNumber}` : ''}
                           </div>
                         )}
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }} className="font-mono">
-                      <span style={{ color: 'var(--slate-600)' }}>
+                      <span style={{ color: 'var(--slate-700)', fontSize: '0.92rem', fontWeight: 600 }}>
                         ₹ {formatINR(inv.financials?.taxableAmount || 0)}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }} className="font-mono">
-                      <span style={{ fontWeight: 800, color: 'var(--slate-900)', fontSize: '0.9rem' }}>
+                      <span style={{ fontWeight: 800, color: 'var(--slate-900)', fontSize: '1.02rem' }}>
                         ₹ {formatINR(inv.financials?.finalTotal || 0)}
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
                         <button
                           onClick={() => onViewInvoice(inv)}
                           className="btn-icon-only"
                           title="Preview & Print A4 PDF"
+                          style={{ padding: '0.5rem' }}
                         >
-                          <Eye size={15} color="var(--slate-600)" />
+                          <Eye size={17} color="var(--slate-700)" />
                         </button>
 
                         <button
                           onClick={() => onEditInvoice(inv)}
                           className="btn-icon-only"
                           title="Edit Invoice"
+                          style={{ padding: '0.5rem' }}
                         >
-                          <Edit3 size={15} color="var(--slate-600)" />
+                          <Edit3 size={17} color="var(--slate-700)" />
                         </button>
 
                         <button
                           onClick={() => onDuplicateInvoice(inv)}
                           className="btn-icon-only"
                           title="Duplicate as New Invoice"
+                          style={{ padding: '0.5rem' }}
                         >
-                          <Copy size={15} color="var(--slate-600)" />
+                          <Copy size={17} color="var(--slate-700)" />
                         </button>
 
                         <button
-                          onClick={() => onDeleteInvoice(inv.id)}
+                          onClick={() => onDeleteInvoice(inv._id || inv.id)}
                           className="btn-icon-only"
-                          title="Delete Invoice"
-                          style={{ color: 'var(--danger)' }}
+                          title="Move to Trash"
+                          style={{ padding: '0.5rem', color: 'var(--danger)' }}
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={17} />
                         </button>
                       </div>
                     </td>
