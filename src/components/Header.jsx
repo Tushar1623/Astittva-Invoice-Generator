@@ -6,7 +6,9 @@ import {
   Settings as SettingsIcon,
   UploadCloud,
   Trash2,
-  Database
+  Database,
+  User,
+  LogOut
 } from 'lucide-react';
 
 export default function Header({ 
@@ -14,7 +16,9 @@ export default function Header({
   setActiveTab, 
   onOpenSettings, 
   onOpenImport, 
-  onOpenTrash 
+  onOpenTrash,
+  currentUser = null,
+  onLogout = null
 }) {
   return (
     <header className="app-header no-print">
@@ -98,6 +102,54 @@ export default function Header({
           >
             <SettingsIcon size={18} />
           </button>
+
+          {/* User Profile Pill & Logout */}
+          {currentUser && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.35rem 0.65rem 0.35rem 0.75rem',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '8px',
+              marginLeft: '0.25rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <User size={15} color="#f59e0b" />
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f8fafc' }}>
+                  {currentUser.name || 'Admin'}
+                </span>
+                <span className="badge badge-gold" style={{ fontSize: '0.62rem', padding: '0.1rem 0.4rem' }}>
+                  {currentUser.role || 'admin'}
+                </span>
+              </div>
+
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0.2rem',
+                    marginLeft: '0.25rem',
+                    borderRadius: '4px',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                  title="Log Out of System"
+                >
+                  <LogOut size={15} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>

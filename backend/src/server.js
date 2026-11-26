@@ -64,14 +64,14 @@ app.use((err, req, res, next) => {
 
 // Start Server & Connect to Database
 async function startServer() {
+  app.listen(PORT, () => {
+    console.log(`[ASTITTVA Invoice Backend] Server running on http://localhost:${PORT}`);
+  });
+
   try {
     await connectToDatabase();
-    app.listen(PORT, () => {
-      console.log(`[ASTITTVA Invoice Backend] Server running on http://localhost:${PORT}`);
-    });
   } catch (err) {
-    console.error('[Server] Failed to initialize backend:', err);
-    process.exit(1);
+    console.warn('[Server] Database connection deferred:', err.message);
   }
 }
 

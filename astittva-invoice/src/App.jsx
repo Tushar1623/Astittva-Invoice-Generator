@@ -7,6 +7,7 @@ import InvoiceHistory from './components/InvoiceHistory';
 import SettingsModal from './components/SettingsModal';
 import ImportReceiptsModal from './components/ImportReceiptsModal';
 import TrashModal from './components/TrashModal';
+import Login from './components/Login';
 import { api } from './services/api';
 import { getStoredCompanyDetails, saveCompanyDetails } from './data/companyDetails';
 import { CheckCircle2, AlertTriangle, X } from 'lucide-react';
@@ -14,6 +15,29 @@ import { CheckCircle2, AlertTriangle, X } from 'lucide-react';
 const STORAGE_KEY_INVOICES = 'astittva_invoices';
 
 export default function App() {
+  // Authentication State (Single Authorized User)
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('astittva_user');
+      const token = localStorage.getItem('astittva_token');
+      if (token && savedUser) return JSON.parse(savedUser);
+    } catch (e) {}
+    return null;
+  });
+
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    showToast(`Welcome back, ${user.name || 'Admin'}!`);
+    loadInvoicesFromBackend();
+    loadSettingsFromBackend();
+  };
+
+  const handleLogout = () => {
+    api.logout();
+    setCurrentUser(null);
+    showToast('You have been signed out successfully.');
+  };
+
   // Navigation tabs: 'dashboard' | 'create' | 'preview' | 'history'
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -178,6 +202,24 @@ export default function App() {
     }
   };
 
+  // If user is not authenticated, display single-user login screen
+  if (!currentUser) {
+    return (
+      <>
+        {toast && (
+          <div className={`toast toast-${toast.type} no-print`} style={{ zIndex: 9999 }}>
+            {toast.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+            <span>{toast.message}</span>
+            <button onClick={() => setToast(null)} className="toast-close">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        <Login onLoginSuccess={handleLoginSuccess} />
+      </>
+    );
+  }
+
   return (
     <div className="app-container">
       <Header 
@@ -186,6 +228,8 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenImport={() => setIsImportOpen(true)}
         onOpenTrash={() => setIsTrashOpen(true)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       <main className="main-content">
