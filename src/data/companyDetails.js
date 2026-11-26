@@ -30,7 +30,7 @@ export const defaultBankAccounts = [
 export const defaultCompanyDetails = {
   companyName: "ASTITTVA MARKETING Pvt Ltd",
   address: "PS IXL Building, 5th Floor, Room 511, Biswa Bangla Sarani, Atghara, New Town, Kolkata, West Bengal – 700136.",
-  rera: "WBRERA/R-001354",
+  rera: "WBRERA/A/NOR/2026/001132",
   phone: "92303 74718",
   email: "businessdevelopment@astittva.in",
   gstin: "19ABFCA7189M1ZV",

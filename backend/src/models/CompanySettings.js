@@ -42,7 +42,7 @@ const CompanySettingsSchema = new mongoose.Schema({
   },
   rera: {
     type: String,
-    default: 'WBRERA/R-001354'
+    default: 'WBRERA/A/NOR/2026/001132'
   },
   phone: {
     type: String,

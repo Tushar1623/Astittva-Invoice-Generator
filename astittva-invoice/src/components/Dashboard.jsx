@@ -104,7 +104,7 @@ export default function Dashboard({
                 State: <strong>{companyDetails?.state || '19 – West Bengal'}</strong>
               </span>
               <span className="hero-meta-pill">
-                RERA: <strong>{companyDetails?.rera || 'WBRERA/R-001354'}</strong>
+                RERA: <strong>{companyDetails?.rera || 'WBRERA/A/NOR/2026/001132'}</strong>
               </span>
               <span className="hero-meta-pill">
                 Bank: <strong>{companyDetails?.bankName || 'AU Small Finance Bank'}</strong>

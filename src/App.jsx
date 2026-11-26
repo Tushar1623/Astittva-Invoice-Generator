@@ -92,14 +92,15 @@ export default function App() {
   const handleSaveInvoice = async (invoiceObj, andPreview = false) => {
     try {
       let savedInvoice = invoiceObj;
-      const isExisting = Boolean(invoiceObj._id);
+      const invoiceId = invoiceObj._id || invoiceObj.id;
+      const isExisting = Boolean(invoiceId);
 
       if (isExisting) {
-        const res = await api.updateInvoice(invoiceObj._id, invoiceObj);
-        if (res.success) savedInvoice = res.invoice;
+        const res = await api.updateInvoice(String(invoiceId), invoiceObj);
+        if (res.success && res.invoice) savedInvoice = res.invoice;
       } else {
         const res = await api.createInvoice(invoiceObj);
-        if (res.success) savedInvoice = res.invoice;
+        if (res.success && res.invoice) savedInvoice = res.invoice;
       }
 
       await loadInvoicesFromBackend();
@@ -204,12 +205,16 @@ export default function App() {
 
         {activeTab === 'create' && (
           <InvoiceForm
+            key={selectedInvoice?._id || selectedInvoice?.id || 'new'}
             initialInvoice={selectedInvoice}
             companyDetails={companyDetails}
             lastInvoice={invoices && invoices.length > 0 ? invoices[0] : null}
             onSave={(inv) => handleSaveInvoice(inv, false)}
             onSaveAndPreview={(inv) => handleSaveInvoice(inv, true)}
-            onCancel={() => setActiveTab('dashboard')}
+            onCancel={() => {
+              setSelectedInvoice(null);
+              setActiveTab('dashboard');
+            }}
           />
         )}
 

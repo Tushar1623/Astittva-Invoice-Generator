@@ -14,31 +14,62 @@ import {
   User,
   Hash,
   RefreshCw,
-  Edit2
+  Edit2,
+  Landmark
 } from 'lucide-react';
 import { calculateInvoiceFinancials, generateItemDescription, formatINR } from '../utils/calculations';
 import { api } from '../services/api';
+import { defaultBankAccounts } from '../data/companyDetails';
 import Calculator from './Calculator';
 
 export default function InvoiceForm({ 
   initialInvoice = null, 
   companyDetails, 
+  lastInvoice = null,
   onSave, 
   onSaveAndPreview, 
   onCancel 
 }) {
   const isEditing = Boolean(initialInvoice?._id || initialInvoice?.id);
 
+  // Available bank accounts (Account 1: AU Small Finance Bank, Account 2: ICICI Bank Limited)
+  const availableBankAccounts = (companyDetails?.bankAccounts && companyDetails.bankAccounts.length > 0)
+    ? companyDetails.bankAccounts
+    : defaultBankAccounts;
+
+  const defaultAccount = availableBankAccounts.find(a => a.isDefault) || availableBankAccounts[0];
+
+  const computePreviousBill = (lastInv) => {
+    if (lastInv) {
+      if (lastInv.displayInvoiceNumber) return lastInv.displayInvoiceNumber;
+      if (lastInv.clientName && !lastInv.invoiceNumber.includes(lastInv.clientName)) {
+        return `${lastInv.clientName} ${lastInv.invoiceNumber}`;
+      }
+      return lastInv.invoiceNumber;
+    }
+    return 'Aparajita Das 008/11/2026';
+  };
+
+  const [previousBill, setPreviousBill] = useState(() => computePreviousBill(lastInvoice));
+
   // Form State
   const [formData, setFormData] = useState(() => {
     if (initialInvoice) {
-      return { ...initialInvoice };
+      const initialBankDetails = initialInvoice.bankDetails || defaultAccount;
+      const initialBankId = initialInvoice.selectedBankAccountId || initialBankDetails.accountId || defaultAccount.id;
+      return { 
+        ...initialInvoice,
+        selectedBankAccountId: initialBankId,
+        bankDetails: initialBankDetails,
+        isManualInvoiceNumber: true
+      };
     }
     const today = new Date().toISOString().slice(0, 10);
     return {
       // Invoice Details
       invoiceNumber: '',
       autoAllocate: true,
+      isManualInvoiceNumber: false,
       invoiceDate: today,
       placeOfSupply: '19 – West Bengal',
 
@@ -62,29 +93,75 @@ export default function InvoiceForm({
       quantity: 1,
       pricePerUnit: 103448,
       cgstRate: companyDetails?.defaultCgstRate || 9,
-      sgstRate: companyDetails?.defaultSgstRate || 9
+      sgstRate: companyDetails?.defaultSgstRate || 9,
+
+      // Bank Account Selection (Default Account 1: AU Small Finance Bank)
+      selectedBankAccountId: defaultAccount.id,
+      bankDetails: defaultAccount
     };
   });
+
+  // Keep form synchronized when switching editing target
+  useEffect(() => {
+    if (initialInvoice) {
+      const initialBankDetails = initialInvoice.bankDetails || defaultAccount;
+      const initialBankId = initialInvoice.selectedBankAccountId || initialBankDetails.accountId || defaultAccount.id;
+      setFormData({
+        ...initialInvoice,
+        selectedBankAccountId: initialBankId,
+        bankDetails: initialBankDetails,
+        isManualInvoiceNumber: true
+      });
+      if (initialInvoice.invoiceNumber) {
+        setPreviewNumber(initialInvoice.invoiceNumber);
+      }
+    }
+  }, [initialInvoice]);
 
   const [previewNumber, setPreviewNumber] = useState('');
   const [loadingNumber, setLoadingNumber] = useState(false);
 
-  // Fetch real-time preview of next number from backend
+  // Helper to extract effective client name for prefixing invoice number
+  const getEffectiveClientName = (client, customer) => {
+    const cName = (client || '').trim();
+    if (cName) return cName;
+    const custName = (customer || '').trim();
+    if (custName && custName !== 'NK Realtors Private Limited') return custName;
+    return custName || '';
+  };
+
+  // Synchronize Previous Bill and suggest next Invoice Number
   useEffect(() => {
     let isMounted = true;
-    async function fetchNext() {
-      if (isEditing && formData.invoiceNumber) {
+    if (isEditing) {
+      if (formData.invoiceNumber) {
         setPreviewNumber(formData.invoiceNumber);
-        return;
       }
+      return;
+    }
+
+    const effectiveName = getEffectiveClientName(formData.clientName, formData.customerName);
+
+    async function fetchNext() {
       setLoadingNumber(true);
       try {
-        const res = await api.peekNextNumber(formData.clientName, formData.invoiceDate);
+        const res = await api.peekNextNumber(effectiveName, formData.invoiceDate, formData.customerName);
         if (isMounted && res.success) {
           setPreviewNumber(res.invoiceNumber);
-          if (!formData.invoiceNumber) {
-            setFormData(prev => ({ ...prev, invoiceNumber: res.invoiceNumber }));
+          if (res.previousBill) {
+            setPreviousBill(res.previousBill);
           }
+          // Pre-fill invoice number if not manually edited by user
+          setFormData(prev => {
+            if (prev.isManualInvoiceNumber && prev.invoiceNumber) {
+              return prev;
+            }
+            return {
+              ...prev,
+              invoiceNumber: res.invoiceNumber,
+              autoAllocate: true
+            };
+          });
         }
       } catch (err) {
         console.warn('Could not peek next invoice number:', err.message);
@@ -92,9 +169,47 @@ export default function InvoiceForm({
         if (isMounted) setLoadingNumber(false);
       }
     }
+
     fetchNext();
     return () => { isMounted = false; };
-  }, [formData.clientName, formData.invoiceDate, isEditing]);
+  }, [formData.clientName, formData.customerName, formData.invoiceDate, isEditing]);
+
+  // Handle clientName change (updates suggested invoiceNumber if not manually typed)
+  const handleClientNameChange = (val) => {
+    setFormData(prev => {
+      const effective = val.trim();
+      const currentFull = prev.invoiceNumber || previewNumber || '';
+      const coreMatch = currentFull.match(/(\d{2,4}\/\d{1,2}\/\d{2,4})$/);
+      const coreSeq = coreMatch ? coreMatch[1] : '';
+      const syncd = coreSeq ? (effective ? `${effective} ${coreSeq}` : coreSeq) : currentFull;
+      if (syncd && !isEditing) {
+        setPreviewNumber(syncd);
+      }
+      return {
+        ...prev,
+        clientName: val,
+        invoiceNumber: !prev.isManualInvoiceNumber && !isEditing && syncd ? syncd : prev.invoiceNumber
+      };
+    });
+  };
+
+  const handleCustomerNameChange = (val) => {
+    setFormData(prev => {
+      const effective = getEffectiveClientName(prev.clientName, val);
+      const currentFull = prev.invoiceNumber || previewNumber || '';
+      const coreMatch = currentFull.match(/(\d{2,4}\/\d{1,2}\/\d{2,4})$/);
+      const coreSeq = coreMatch ? coreMatch[1] : '';
+      const syncd = coreSeq ? (effective ? `${effective} ${coreSeq}` : coreSeq) : currentFull;
+      if (syncd && !isEditing) {
+        setPreviewNumber(syncd);
+      }
+      return {
+        ...prev,
+        customerName: val,
+        invoiceNumber: !prev.isManualInvoiceNumber && !isEditing && syncd ? syncd : prev.invoiceNumber
+      };
+    });
+  };
 
   // Financial Calculation State
   const [calculation, setCalculation] = useState(() => {
@@ -165,13 +280,37 @@ export default function InvoiceForm({
 
   const handleManualRegenerate = async () => {
     try {
-      const res = await api.peekNextNumber(formData.clientName, formData.invoiceDate);
+      setLoadingNumber(true);
+      const effectiveName = getEffectiveClientName(formData.clientName, formData.customerName);
+      const res = await api.peekNextNumber(effectiveName, formData.invoiceDate, formData.customerName);
       if (res.success) {
-        setFormData(prev => ({ ...prev, invoiceNumber: res.invoiceNumber }));
+        setFormData(prev => ({ ...prev, invoiceNumber: res.invoiceNumber, autoAllocate: true }));
         setPreviewNumber(res.invoiceNumber);
       }
     } catch (err) {
-      console.warn(err);
+      console.warn('Manual regenerate error:', err);
+    } finally {
+      setLoadingNumber(false);
+    }
+  };
+
+  const handleBankAccountSelect = (accountId) => {
+    const chosen = availableBankAccounts.find(a => a.id === accountId);
+    if (chosen) {
+      setFormData(prev => ({
+        ...prev,
+        selectedBankAccountId: chosen.id,
+        bankDetails: {
+          accountId: chosen.id,
+          bankName: chosen.bankName,
+          accountNumber: chosen.accountNumber,
+          ifsc: chosen.ifsc || chosen.ifscCode,
+          ifscCode: chosen.ifscCode || chosen.ifsc,
+          accountHolder: chosen.accountHolder || chosen.accountHolderName,
+          accountHolderName: chosen.accountHolderName || chosen.accountHolder,
+          branch: chosen.branch || ''
+        }
+      }));
     }
   };
 
@@ -183,11 +322,23 @@ export default function InvoiceForm({
       sgstRate: formData.sgstRate
     });
 
+    const isManual = Boolean(formData.isManualInvoiceNumber);
+    const invoiceId = formData._id || formData.id || initialInvoice?._id || initialInvoice?.id;
+
     return {
       ...formData,
-      allocateNewNumber: !isEditing && formData.autoAllocate,
+      ...(invoiceId && { _id: invoiceId, id: invoiceId }),
+      selectedBankAccountId: formData.selectedBankAccountId || 'account_1',
+      bankDetails: formData.bankDetails,
+      allocateNewNumber: !isEditing && !isManual && formData.autoAllocate,
       financials: finalCalculations,
-      companySnapshot: { ...companyDetails }
+      companySnapshot: { 
+        ...companyDetails,
+        bankName: formData.bankDetails?.bankName || companyDetails?.bankName,
+        accountNumber: formData.bankDetails?.accountNumber || companyDetails?.accountNumber,
+        ifsc: formData.bankDetails?.ifsc || companyDetails?.ifsc,
+        accountHolder: formData.bankDetails?.accountHolder || companyDetails?.accountHolder
+      }
     };
   };
 
@@ -206,23 +357,49 @@ export default function InvoiceForm({
   return (
     <div className="invoice-form-container" style={{ maxWidth: '1080px', margin: '0 auto' }}>
       {/* Form Page Header */}
-      <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div className="card" style={{ padding: '1.5rem 1.75rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--slate-900)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileText size={20} color="var(--gold-500)" />
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--slate-900)', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <FileText size={22} color="var(--gold-600)" />
               <span>{isEditing ? `Edit Invoice: ${formData.invoiceNumber}` : 'Create New Tax Invoice'}</span>
             </h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--slate-500)', marginTop: '0.2rem' }}>
-              Numbers are atomically allocated upon invoice issue: <code>Client Name + XXX/MM/YYYY</code>.
+            <p style={{ fontSize: '0.88rem', color: 'var(--slate-600)', marginTop: '0.25rem' }}>
+              Reference previous bill and enter or customize client name and invoice number: <code>Client Name + XXX/MM/YY</code>.
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span className="badge badge-gold">
-              <span>Anticipated Number:</span>
-              <strong className="font-mono">{loadingNumber ? 'Calculating...' : previewNumber || '—'}</strong>
-            </span>
+          <div style={{
+            background: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)',
+            border: '2px solid #f59e0b',
+            borderRadius: '12px',
+            padding: '0.75rem 1.25rem',
+            boxShadow: '0 3px 12px rgba(245, 158, 11, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.85rem'
+          }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '9px',
+              background: '#d97706',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <FileText size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Previous Created Bill
+              </div>
+              <div className="font-mono" style={{ fontSize: '1.1rem', fontWeight: 800, color: '#78350f', letterSpacing: '-0.01em', marginTop: '0.1rem' }}>
+                {previousBill || (lastInvoice ? computePreviousBill(lastInvoice) : 'Aparajita Das 008/11/26')}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -237,35 +414,51 @@ export default function InvoiceForm({
 
           <div className="form-grid">
             {/* Invoice Number */}
-            <div className="form-group">
+            <div className="form-group" style={{ gridColumn: 'span 2' }}>
               <label className="form-label required">
-                <span>Invoice Number</span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--gold-600)', textTransform: 'none' }}>
-                  Format: Client Name XXX/MM/YYYY
+                <span style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--slate-900)' }}>Invoice Number</span>
+                <span style={{ fontSize: '0.78rem', color: '#b48528', fontWeight: 700, textTransform: 'none' }}>
+                  (Manually enter or edit: Client Name XXX/MM/YY)
                 </span>
               </label>
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
                 <input
                   type="text"
                   required
-                  value={formData.invoiceNumber}
-                  onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value, autoAllocate: false })}
-                  placeholder="e.g. Aparajita Das 009/11/2026"
+                  value={formData.invoiceNumber || ''}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    invoiceNumber: e.target.value,
+                    isManualInvoiceNumber: true,
+                    autoAllocate: false
+                  }))}
+                  placeholder="e.g. Aparajita Das 009/11/26"
                   className="form-input font-mono"
-                  style={{ fontWeight: 700 }}
+                  style={{
+                    fontSize: '1.1rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.02em',
+                    backgroundColor: '#ffffff',
+                    color: 'var(--slate-900)',
+                    border: '2px solid var(--slate-300)',
+                    padding: '0.75rem 1rem'
+                  }}
+                  title="Manually enter or edit the client name and invoice number."
                 />
                 <button
                   type="button"
                   onClick={handleManualRegenerate}
                   className="btn btn-secondary"
-                  title="Refresh number from database counter"
-                  style={{ padding: '0.5rem 0.75rem' }}
+                  title="Auto-fill next sequential number"
+                  style={{ padding: '0.65rem 1.15rem', display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, whiteSpace: 'nowrap' }}
                 >
-                  <RefreshCw size={14} />
+                  <RefreshCw size={15} className={loadingNumber ? 'spin' : ''} />
+                  <span>Next Number</span>
                 </button>
               </div>
-              <span className="form-helper-text">
-                {formData.autoAllocate ? 'Atomic sequence allocated upon issue.' : 'Custom number manually specified.'}
+              <span className="form-helper-text" style={{ color: 'var(--slate-600)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.84rem', marginTop: '0.3rem' }}>
+                <Sparkles size={14} color="#b48528" />
+                <span>Format: <code>Client Name XXX/MM/YY</code>. You can customize the client name and sequential number directly.</span>
               </span>
             </div>
 
@@ -274,7 +467,7 @@ export default function InvoiceForm({
               <label className="form-label required">Invoice Date</label>
               <div className="input-with-icon-wrapper">
                 <span className="input-prefix-icon">
-                  <Calendar size={15} />
+                  <Calendar size={16} />
                 </span>
                 <input
                   type="date"
@@ -291,7 +484,7 @@ export default function InvoiceForm({
               <label className="form-label required">Place of Supply</label>
               <div className="input-with-icon-wrapper">
                 <span className="input-prefix-icon">
-                  <MapPin size={15} />
+                  <MapPin size={16} />
                 </span>
                 <input
                   type="text"
@@ -337,7 +530,7 @@ export default function InvoiceForm({
                   type="text"
                   required
                   value={formData.customerName}
-                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                  onChange={(e) => handleCustomerNameChange(e.target.value)}
                   placeholder="e.g. NK Realtors Private Limited"
                   className="form-input has-icon"
                   style={{ fontWeight: 600 }}
@@ -410,7 +603,7 @@ export default function InvoiceForm({
                   type="text"
                   required
                   value={formData.clientName}
-                  onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+                  onChange={(e) => handleClientNameChange(e.target.value)}
                   placeholder="e.g. Aparajita Das"
                   className="form-input has-icon"
                 />
@@ -629,6 +822,109 @@ export default function InvoiceForm({
           </div>
         </div>
 
+        {/* SECTION 5: BANK ACCOUNT DETAILS */}
+        <div className="card">
+          <div className="section-badge-header">
+            <span className="section-number-pill">5</span>
+            <span className="section-title-text">Bank Account Details</span>
+          </div>
+
+          <p style={{ fontSize: '0.88rem', color: 'var(--slate-600)', marginBottom: '1.25rem' }}>
+            Choose which company bank account appears in the Bank Details section of the generated invoice PDF.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            {availableBankAccounts.map((acc) => {
+              const isSelected = formData.selectedBankAccountId === acc.id;
+              return (
+                <label
+                  key={acc.id}
+                  style={{
+                    display: 'block',
+                    cursor: 'pointer',
+                    border: isSelected ? '2.5px solid #b48528' : '1.5px solid var(--slate-300)',
+                    background: isSelected ? '#fffdf7' : '#ffffff',
+                    boxShadow: isSelected ? '0 4px 16px rgba(180, 133, 40, 0.2)' : '0 1px 3px rgba(0,0,0,0.05)',
+                    borderRadius: '12px',
+                    padding: '1.25rem 1.4rem',
+                    transition: 'all 0.2s ease',
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <input
+                        type="radio"
+                        name="selectedBankAccountId"
+                        value={acc.id}
+                        checked={isSelected}
+                        onChange={() => handleBankAccountSelect(acc.id)}
+                        style={{ accentColor: '#b48528', width: '20px', height: '20px', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: isSelected ? '#78350f' : 'var(--slate-900)' }}>
+                        {acc.bankName}
+                      </span>
+                    </div>
+                    {acc.isDefault ? (
+                      <span className="badge badge-gold" style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem' }}>Account 1 (Default)</span>
+                    ) : (
+                      <span className="badge badge-secondary" style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem' }}>Account 2</span>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '0.88rem', color: 'var(--slate-700)', lineHeight: 1.7, paddingLeft: '1.85rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--slate-500)', fontWeight: 600 }}>Account Holder:</span>{' '}
+                      <strong style={{ color: 'var(--slate-900)' }}>{acc.accountHolder || acc.accountHolderName}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--slate-500)', fontWeight: 600 }}>Account Number:</span>{' '}
+                      <strong className="font-mono" style={{ color: 'var(--slate-900)', fontSize: '1.02rem' }}>{acc.accountNumber}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--slate-500)', fontWeight: 600 }}>IFSC Code:</span>{' '}
+                      <strong className="font-mono" style={{ color: 'var(--slate-900)', fontSize: '0.94rem' }}>{acc.ifsc || acc.ifscCode}</strong>
+                    </div>
+                    {acc.branch && (
+                      <div>
+                        <span style={{ color: 'var(--slate-500)', fontWeight: 600 }}>Branch:</span> {acc.branch}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          {/* Active selection summary pill */}
+          <div style={{
+            background: 'var(--slate-100)',
+            border: '1.5px solid var(--slate-300)',
+            borderRadius: '10px',
+            padding: '0.95rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.65rem',
+            fontSize: '0.92rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <Landmark size={18} color="var(--gold-600)" />
+              <span style={{ color: 'var(--slate-600)', fontWeight: 600 }}>Active on Invoice:</span>
+              <strong style={{ color: 'var(--slate-900)', fontSize: '0.98rem' }}>
+                {formData.bankDetails?.bankName || 'AU Small Finance Bank'}
+              </strong>
+              <span className="font-mono" style={{ color: 'var(--slate-600)', fontWeight: 700 }}>
+                ({formData.bankDetails?.accountNumber})
+              </span>
+            </div>
+            <span style={{ fontSize: '0.84rem', color: 'var(--slate-600)' }}>
+              IFSC: <strong className="font-mono" style={{ color: 'var(--slate-900)' }}>{formData.bankDetails?.ifsc || formData.bankDetails?.ifscCode}</strong>
+            </span>
+          </div>
+        </div>
+
         {/* REAL-TIME CALCULATOR PANEL */}
         <Calculator calculation={calculation} title="Live Real-time GST & Total Calculator" />
 
@@ -638,24 +934,28 @@ export default function InvoiceForm({
             type="button"
             onClick={onCancel}
             className="btn btn-secondary"
+            style={{ padding: '0.75rem 1.4rem' }}
           >
-            Cancel
+            <RotateCcw size={16} />
+            <span>Cancel</span>
           </button>
 
           <button
             type="submit"
             className="btn btn-dark"
+            style={{ padding: '0.75rem 1.6rem' }}
           >
-            <Save size={16} />
-            <span>Save & Issue to MongoDB</span>
+            <Save size={18} />
+            <span>Save & Issue to Database</span>
           </button>
 
           <button
             type="button"
             onClick={handleSaveAndPreview}
             className="btn btn-primary"
+            style={{ padding: '0.75rem 1.85rem' }}
           >
-            <Eye size={16} />
+            <Eye size={18} />
             <span>Issue & Preview A4 PDF</span>
           </button>
         </div>

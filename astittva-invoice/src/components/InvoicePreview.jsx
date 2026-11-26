@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Download, Printer, ArrowLeft, Edit3, CheckCircle, FileText, Share2, Sparkles } from 'lucide-react';
-import { formatINR } from '../utils/calculations';
+import { formatINR, calculateInvoiceFinancials } from '../utils/calculations';
 import { numberToWords } from '../utils/numberToWords';
 import { downloadInvoicePDF, printInvoice } from '../utils/pdfGenerator';
 
@@ -8,9 +8,24 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
   if (!invoice) return null;
 
   const [downloading, setDownloading] = useState(false);
-  const comp = invoice.companySnapshot || companyDetails;
-  const calc = invoice.financials;
-  const words = numberToWords(calc.finalTotal);
+  const comp = invoice.companySnapshot || companyDetails || {};
+  const calc = invoice.financials || calculateInvoiceFinancials({
+    quantity: invoice.quantity || 1,
+    pricePerUnit: invoice.pricePerUnit || 0,
+    cgstRate: invoice.cgstRate ?? 9,
+    sgstRate: invoice.sgstRate ?? 9
+  });
+  const words = numberToWords(calc?.finalTotal || 0);
+
+  // Bank Account details (prioritize invoice.bankDetails, fallback to comp fields)
+  const bank = invoice.bankDetails || comp?.bankDetails || {
+    bankName: comp?.bankName || 'AU Small Finance Bank',
+    accountNumber: comp?.accountNumber || '2602262416089178',
+    ifsc: comp?.ifsc || 'AUBL0002624',
+    ifscCode: comp?.ifsc || 'AUBL0002624',
+    accountHolder: comp?.accountHolder || comp?.accountHolderName || 'ASTITTVA MARKETING Pvt Ltd',
+    accountHolderName: comp?.accountHolderName || comp?.accountHolder || 'ASTITTVA MARKETING Pvt Ltd'
+  };
 
   const handleDownload = async () => {
     try {
@@ -30,8 +45,8 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             {onBack && (
-              <button 
-                onClick={onBack} 
+              <button
+                onClick={onBack}
                 className="btn btn-secondary"
                 style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
               >
@@ -57,8 +72,8 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {onEdit && (
-              <button 
-                onClick={() => onEdit(invoice)} 
+              <button
+                onClick={() => onEdit(invoice)}
                 className="btn btn-secondary"
                 style={{ fontSize: '0.82rem' }}
               >
@@ -67,8 +82,8 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
               </button>
             )}
 
-            <button 
-              onClick={printInvoice} 
+            <button
+              onClick={printInvoice}
               className="btn btn-secondary"
               style={{ fontSize: '0.82rem' }}
             >
@@ -76,8 +91,8 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
               <span>Print</span>
             </button>
 
-            <button 
-              onClick={handleDownload} 
+            <button
+              onClick={handleDownload}
               className="btn btn-primary"
               disabled={downloading}
               style={{ fontSize: '0.82rem' }}
@@ -92,11 +107,11 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
       {/* Printable Invoice Container (Strict layout for pixel-perfect PDF rendering) */}
       <div className="invoice-wrapper">
         <div id="invoice-printable-area" className="invoice-doc">
-          
+
           <div className="doc-top-title">Tax Invoice</div>
 
           <div className="doc-bordered-box">
-            
+
             {/* Header: Logo and Company Info */}
             <div className="doc-header-row">
               <div className="doc-header-logo">
@@ -105,7 +120,7 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
               <div className="doc-company-info">
                 <div className="doc-company-name">{comp.companyName}</div>
                 <div className="doc-company-line">{comp.address}</div>
-                {comp.rera && <div className="doc-company-line">{comp.rera}</div>}
+                <div className="doc-company-line">{comp.rera || 'WBRERA/A/NOR/2026/001132'}</div>
                 <div className="doc-company-line">Phone no.: {comp.phone} &nbsp; Email: {comp.email}</div>
                 <div className="doc-company-line">GSTIN: {comp.gstin} &nbsp; State: {comp.state}</div>
               </div>
@@ -232,7 +247,7 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
                     <tr>
                       <td>Round off</td>
                       <td className="text-right font-mono">
-                        {calc.roundOff < 0 ? `- ₹ ${Math.abs(calc.roundOff).toFixed(2)}` : `₹ ${calc.roundOff.toFixed(2)}`}
+                        {(Number(calc?.roundOff || 0)) < 0 ? `- ₹ ${Math.abs(Number(calc?.roundOff || 0)).toFixed(2)}` : `₹ ${(Number(calc?.roundOff || 0)).toFixed(2)}`}
                       </td>
                     </tr>
                     <tr className="total-highlight">
@@ -254,10 +269,10 @@ export default function InvoicePreview({ invoice, companyDetails, onEdit, onBack
 
                 <div className="doc-bar">Bank Details</div>
                 <div className="doc-bank-content">
-                  <div><b>Bank Name :</b> {comp.bankName}</div>
-                  <div><b>Account No. :</b> {comp.accountNumber}</div>
-                  <div><b>IFSC :</b> {comp.ifsc}</div>
-                  <div><b>Account Holder :</b> {comp.accountHolder}</div>
+                  <div><b>Bank Name :</b> {bank.bankName}</div>
+                  <div><b>Account Holder Name :</b> {bank.accountHolder || bank.accountHolderName}</div>
+                  <div><b>Account Number :</b> {bank.accountNumber}</div>
+                  <div><b>IFSC Code :</b> {bank.ifsc || bank.ifscCode}</div>
                 </div>
               </div>
 

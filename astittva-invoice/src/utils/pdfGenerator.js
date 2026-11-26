@@ -24,7 +24,8 @@ export async function downloadInvoicePDF(elementId, invoiceNumber = 'invoice') {
 
   // Dynamic import of html2pdf.js to support client environments
   try {
-    const html2pdf = (await import('html2pdf.js')).default;
+    const html2pdfModule = await import('html2pdf.js');
+    const html2pdf = html2pdfModule.default || html2pdfModule;
 
     const opt = {
       margin: [8, 8, 8, 8], // mm
@@ -43,7 +44,7 @@ export async function downloadInvoicePDF(elementId, invoiceNumber = 'invoice') {
       }
     };
 
-    return html2pdf().set(opt).from(element).save();
+    return await html2pdf().set(opt).from(element).save();
   } catch (err) {
     console.warn('html2pdf execution error, triggering browser print as fallback:', err);
     window.print();

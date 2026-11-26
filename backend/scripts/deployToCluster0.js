@@ -76,6 +76,7 @@ async function setupCluster() {
     companyName: 'ASTITTVA MARKETING',
     tagline: 'REAL ESTATE & MARKETING CONSULTANCY',
     address: 'Action Area II, Rajarhat, Newtown, Kolkata, West Bengal - 700135',
+    rera: 'WBRERA/A/NOR/2026/001132',
     phone: '+91 98300 00000',
     email: 'info@astitva.com',
     pan: 'ABCDE1234F',

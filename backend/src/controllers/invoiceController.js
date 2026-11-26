@@ -342,9 +342,9 @@ async function updateInvoice(req, res) {
 
     let query;
     try {
-      query = { $or: [{ _id: new ObjectId(id) }, { id: id }] };
+      query = { $or: [{ _id: new ObjectId(id) }, { id: id }, { _id: id }] };
     } catch {
-      query = { id: id };
+      query = { $or: [{ id: id }, { _id: id }] };
     }
 
     const existing = await invoices.findOne(query);
@@ -363,9 +363,18 @@ async function updateInvoice(req, res) {
       }
     }
 
+    let effectivePricePerUnit = data.pricePerUnit !== undefined ? data.pricePerUnit : existing.pricePerUnit;
+    if (data.cvAmount !== undefined && data.brokeragePercentage !== undefined) {
+      const cv = Number(data.cvAmount);
+      const bp = Number(data.brokeragePercentage);
+      if (cv > 0 && bp > 0 && (data.pricePerUnit === undefined || data.pricePerUnit === existing.pricePerUnit)) {
+        effectivePricePerUnit = Math.round((cv * (bp / 100)) * 100) / 100;
+      }
+    }
+
     const financials = calculateFinancials({
       quantity: data.quantity !== undefined ? data.quantity : existing.quantity,
-      pricePerUnit: data.pricePerUnit !== undefined ? data.pricePerUnit : existing.pricePerUnit,
+      pricePerUnit: effectivePricePerUnit,
       cgstRate: data.cgstRate !== undefined ? data.cgstRate : existing.financials?.cgstRate,
       sgstRate: data.sgstRate !== undefined ? data.sgstRate : existing.financials?.sgstRate,
       igstRate: data.igstRate !== undefined ? data.igstRate : (existing.financials?.igstRate || 0)
@@ -381,21 +390,36 @@ async function updateInvoice(req, res) {
       bankSnapshot = bankResolution.snapshot;
     }
 
+    const effClientName = data.clientName !== undefined ? data.clientName : existing.clientName;
+    const effInvoiceNumber = data.invoiceNumber || existing.invoiceNumber;
+    let effDisplayNumber = data.displayInvoiceNumber;
+    if (effClientName && effInvoiceNumber) {
+      if (!effDisplayNumber || (data.clientName && !effDisplayNumber.includes(effClientName))) {
+        if (!effInvoiceNumber.includes(effClientName)) {
+          effDisplayNumber = `${effClientName} ${effInvoiceNumber}`;
+        } else {
+          effDisplayNumber = effInvoiceNumber;
+        }
+      }
+    }
+
     const updateFields = {
       ...(data.invoiceNumber && { invoiceNumber: data.invoiceNumber }),
+      displayInvoiceNumber: effDisplayNumber,
       ...(data.invoiceDate && { invoiceDate: data.invoiceDate }),
       ...(data.placeOfSupply && { placeOfSupply: data.placeOfSupply }),
       ...(data.customerName && { customerName: data.customerName }),
       ...(data.customerGstin !== undefined && { customerGstin: data.customerGstin.toUpperCase() }),
       ...(data.customerState && { customerState: data.customerState }),
       ...(data.billingAddress !== undefined && { billingAddress: data.billingAddress }),
-      ...(data.clientName && { clientName: data.clientName }),
+      ...(data.clientName !== undefined && { clientName: data.clientName }),
       ...(data.projectName !== undefined && { projectName: data.projectName }),
       ...(data.flatNumber !== undefined && { flatNumber: data.flatNumber }),
       ...(data.cvAmount !== undefined && { cvAmount: Number(data.cvAmount) }),
       ...(data.brokeragePercentage !== undefined && { brokeragePercentage: Number(data.brokeragePercentage) }),
       ...(data.itemDescription !== undefined && { itemDescription: data.itemDescription }),
       ...(data.hsnSac && { hsnSac: data.hsnSac }),
+      ...(data.companySnapshot && { companySnapshot: data.companySnapshot }),
       ...(bankSnapshot && {
         bankDetails: bankSnapshot,
         selectedBankAccountId: bankSnapshot.accountId

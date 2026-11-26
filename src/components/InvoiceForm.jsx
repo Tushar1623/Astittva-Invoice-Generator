@@ -101,6 +101,23 @@ export default function InvoiceForm({
     };
   });
 
+  // Keep form synchronized when switching editing target
+  useEffect(() => {
+    if (initialInvoice) {
+      const initialBankDetails = initialInvoice.bankDetails || defaultAccount;
+      const initialBankId = initialInvoice.selectedBankAccountId || initialBankDetails.accountId || defaultAccount.id;
+      setFormData({
+        ...initialInvoice,
+        selectedBankAccountId: initialBankId,
+        bankDetails: initialBankDetails,
+        isManualInvoiceNumber: true
+      });
+      if (initialInvoice.invoiceNumber) {
+        setPreviewNumber(initialInvoice.invoiceNumber);
+      }
+    }
+  }, [initialInvoice]);
+
   const [previewNumber, setPreviewNumber] = useState('');
   const [loadingNumber, setLoadingNumber] = useState(false);
 
@@ -306,9 +323,11 @@ export default function InvoiceForm({
     });
 
     const isManual = Boolean(formData.isManualInvoiceNumber);
+    const invoiceId = formData._id || formData.id || initialInvoice?._id || initialInvoice?.id;
 
     return {
       ...formData,
+      ...(invoiceId && { _id: invoiceId, id: invoiceId }),
       selectedBankAccountId: formData.selectedBankAccountId || 'account_1',
       bankDetails: formData.bankDetails,
       allocateNewNumber: !isEditing && !isManual && formData.autoAllocate,

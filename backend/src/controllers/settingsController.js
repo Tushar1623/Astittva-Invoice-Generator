@@ -5,7 +5,7 @@ const { CONFIGURED_BANK_ACCOUNTS, getDefaultBankAccount } = require('../config/b
 const defaultSettings = {
   companyName: 'ASTITTVA MARKETING Pvt Ltd',
   address: 'PS IXL Building, 5th Floor, Room 511, Biswa Bangla Sarani, Atghara, New Town, Kolkata, West Bengal 700136',
-  rera: 'WBRERA/R-001354',
+  rera: 'WBRERA/A/NOR/2026/001132',
   phone: '92303 74718',
   email: 'businessdevelopment@astittva.in',
   gstin: '19ABFCA7189M1ZV',
@@ -27,10 +27,22 @@ async function getSettings(req, res) {
     if (!doc) {
       doc = { _id: 'global_settings', ...defaultSettings, createdAt: new Date() };
       await col.insertOne(doc);
-    } else if (!doc.bankAccounts || !Array.isArray(doc.bankAccounts) || doc.bankAccounts.length === 0) {
-      // Ensure bankAccounts are populated with configured accounts
-      doc.bankAccounts = CONFIGURED_BANK_ACCOUNTS;
-      await col.updateOne({ _id: 'global_settings' }, { $set: { bankAccounts: CONFIGURED_BANK_ACCOUNTS } });
+    } else {
+      let needsUpdate = false;
+      const updates = {};
+      if (doc.rera === 'WBRERA/R-001354' || !doc.rera) {
+        doc.rera = 'WBRERA/A/NOR/2026/001132';
+        updates.rera = 'WBRERA/A/NOR/2026/001132';
+        needsUpdate = true;
+      }
+      if (!doc.bankAccounts || !Array.isArray(doc.bankAccounts) || doc.bankAccounts.length === 0) {
+        doc.bankAccounts = CONFIGURED_BANK_ACCOUNTS;
+        updates.bankAccounts = CONFIGURED_BANK_ACCOUNTS;
+        needsUpdate = true;
+      }
+      if (needsUpdate) {
+        await col.updateOne({ _id: 'global_settings' }, { $set: updates });
+      }
     }
     res.json({ success: true, settings: doc });
   } catch (err) {

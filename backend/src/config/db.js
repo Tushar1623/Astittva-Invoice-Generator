@@ -27,6 +27,10 @@ async function connectToDatabase() {
     throw new Error('MONGO_URL must be set in the backend environment.');
   }
 
+  if (uri.includes('<db_password>')) {
+    throw new Error('MONGO_URL contains the placeholder "<db_password>". Please replace it with your MongoDB password in the backend environment.');
+  }
+
   // Connect Mongoose to MongoDB Atlas
   await mongoose.connect(uri, {
     dbName,
@@ -39,9 +43,35 @@ async function connectToDatabase() {
   });
 
   const db = mongoose.connection.db;
+
+  // Verify connection with a database ping before accepting operations
+  await db.command({ ping: 1 });
+  console.log(`[MongoDB/Mongoose] Database ping successful. Verified Atlas connection.`);
+
   bucket = new GridFSBucket(db, { bucketName: 'fs' });
 
   console.log(`[MongoDB/Mongoose] Connected successfully to Atlas database: "${dbName}"`);
+
+  // Historical data safeguard: if target db has 0 invoices, migrate from astitva_realestate if available on cluster
+  try {
+    const invCount = await db.collection('invoices').countDocuments();
+    if (invCount === 0 && dbName !== 'astitva_realestate') {
+      const fallbackDb = mongoose.connection.client.db('astitva_realestate');
+      const fallbackCount = await fallbackDb.collection('invoices').countDocuments();
+      if (fallbackCount > 0) {
+        console.log(`[MongoDB/Mongoose] Migrating ${fallbackCount} historical invoices from astitva_realestate to ${dbName}...`);
+        const srcInvoices = await fallbackDb.collection('invoices').find({}).toArray();
+        if (srcInvoices.length > 0) await db.collection('invoices').insertMany(srcInvoices);
+        const srcCounters = await fallbackDb.collection('counters').find({}).toArray();
+        if (srcCounters.length > 0) await db.collection('counters').insertMany(srcCounters);
+        const srcImports = await fallbackDb.collection('invoiceImports').find({}).toArray();
+        if (srcImports.length > 0) await db.collection('invoiceImports').insertMany(srcImports);
+        console.log(`[MongoDB/Mongoose] Historical data successfully preserved in "${dbName}".`);
+      }
+    }
+  } catch (migErr) {
+    console.warn('[MongoDB/Mongoose] Historical migration check notice:', migErr.message);
+  }
 
   // Initialize indexes via Mongoose schemas
   await initializeIndexes(db);
